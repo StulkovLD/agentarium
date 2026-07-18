@@ -1,0 +1,19 @@
+# секреты — не существуют в git
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+
+# генерируемое
+docker-compose.agents.yml
+
+# os / ide
+.DS_Store
+.idea/
+.vscode/
