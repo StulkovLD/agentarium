@@ -1,0 +1,31 @@
+# Единственный источник фазы, версии и гейтов. Меняется чаще всех — потому отдельный файл.
+program: agentarium
+version: 0.0.0        # MAJOR — пивот точки Б · MINOR — принятая итерация «спека+код» · PATCH — фикс кода без изменения бумаги
+phase: paper_in_review # бумага написана, ждёт ревью по аксиомам
+
+gates:
+  G0-paper-accepted:
+    status: open       # закрывается ревью Лукьяна; при закрытии: seal = коммит принятия, version -> 0.1.0
+    seal: null
+  G1-core-built:       # слайсы S1-S6 закрыты
+    status: pending
+  G2-poc-live:         # слайсы S7-S8 закрыты, демо проходит
+    status: pending
+  G3-release:          # S9 закрыт, финальный прогон на чистом клоне
+    status: pending
+
+slices:
+  S1-skeleton-envelope: pending
+  S2-bus-sdk: pending
+  S3-topology: pending
+  S4-observability: pending
+  S5-storage: pending
+  S6-gateway: pending
+  S7-poc-agents: pending
+  S8-demo-resilience: pending
+  S9-polish-release: pending
+
+authorized:
+  implementation: false   # откроется гейтом G0
+  github_push: true
+  publish_repo: false     # публичным репо становится только перед сдачей
