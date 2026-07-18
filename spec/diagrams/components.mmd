@@ -1,0 +1,35 @@
+%% Компоненты системы (конфигурация A). Проекция спеков 40/45/55 — не источник истины.
+flowchart LR
+    subgraph client[Проверяющий]
+        H[curl / Swagger UI / make demo]
+    end
+
+    subgraph core[Ядро — предметки не знает]
+        GW[gateway<br/>FastAPI]
+        BUS[(RabbitMQ<br/>topic exchange + очереди)]
+        PG[(PostgreSQL<br/>склад состояния)]
+        QD[(Qdrant<br/>склад знаний)]
+        JG[Jaeger<br/>трейсы]
+    end
+
+    subgraph agents[Агенты PoC — мозги: LangGraph + GigaChat]
+        P[parser]
+        K[knowledge · rag]
+        E[executor]
+    end
+
+    TDB[(target-db<br/>PostgreSQL-пациент)]
+    LLM[GigaChat API<br/>облако]
+
+    H -->|POST /requests| GW
+    GW <--> BUS
+    BUS <--> P
+    BUS <--> K
+    BUS <--> E
+    GW --> PG
+    K --> QD
+    E --> TDB
+    P -.-> LLM
+    K -.-> LLM
+    E -.-> LLM
+    P & K & E & GW -.->|спаны| JG

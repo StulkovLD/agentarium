@@ -1,0 +1,13 @@
+%% Две конфигурации из одних кубиков — правился только YAML. Проекция спека 55.
+flowchart TB
+    subgraph A[configs/dba-base.yaml]
+        a0([request.new]) --> a1[parser] --> a2[knowledge<br/>rag · regulations] --> a3[executor] --> a4([plan.ready → gateway])
+    end
+
+    subgraph B[configs/dba-extended.yaml — плюс auditor, только YAML]
+        b0([request.new]) --> b1[parser] --> b2[knowledge<br/>rag · regulations] --> b3[executor]
+        b3 --> b4([plan.ready])
+        b4 --> b5[gateway]
+        b4 --> b6[auditor<br/>rag · incidents]
+        b6 --> b7([audit.done → gateway])
+    end

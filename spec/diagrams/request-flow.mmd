@@ -1,0 +1,28 @@
+%% Путь заявки (конфигурация A). Проекция спеков 20/55 — не источник истины.
+sequenceDiagram
+    autonumber
+    actor U as Проверяющий
+    participant GW as gateway
+    participant BUS as шина
+    participant P as parser
+    participant K as knowledge (rag)
+    participant E as executor
+    participant T as target-db
+
+    U->>GW: POST /requests {text}
+    GW->>GW: trace_id · запись в Postgres (accepted)
+    GW->>BUS: Envelope type=request.new
+    BUS->>P: очередь parser
+    P->>P: LLM: интент + сущности
+    P->>BUS: request.parsed
+    BUS->>K: очередь knowledge
+    K->>K: вектор запроса → поиск в Qdrant
+    K->>BUS: knowledge.found
+    BUS->>E: очередь executor
+    E->>T: реальные проверки (версия, роли, права)
+    E->>E: LLM: план работ + вердикт
+    E->>BUS: plan.ready
+    BUS->>GW: очередь gateway
+    GW->>GW: результат в Postgres (done)
+    U->>GW: GET /requests/{trace_id}
+    GW-->>U: план + проверки + вердикт
