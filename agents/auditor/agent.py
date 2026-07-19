@@ -110,7 +110,9 @@ class AuditorAgent(Agent):
         payload = PlanReadyPayload.model_validate(envelope.payload)  # типизированно, для запроса
         query = build_query(payload.plan)
         vector = (await asyncio.to_thread(self._embedder.embed, [query]))[0]
-        hits = self._incidents.search(vector, limit=TOP_K, score_threshold=SCORE_THRESHOLD)
+        hits = await asyncio.to_thread(
+            self._incidents.search, vector, limit=TOP_K, score_threshold=SCORE_THRESHOLD
+        )
         result = await self._llm().ainvoke(
             [
                 ("system", _AUDIT_SYS),

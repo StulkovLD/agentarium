@@ -14,7 +14,7 @@ from aio_pika.abc import AbstractIncomingMessage
 from opentelemetry.trace import SpanKind
 
 from agentarium import contracts, observability
-from agentarium.bus import Bus
+from agentarium.bus import Bus, UnroutableEnvelope
 from agentarium.envelope import Envelope, Reply
 from agentarium.health import HealthServer
 
@@ -133,16 +133,18 @@ class Agent:
                 while True:
                     attempts += 1
                     span.set_attribute("attempt", attempts)
+                    watchdog = asyncio.timeout(self._watchdog_s)
                     try:
-                        reply = await asyncio.wait_for(
-                            self.handle(envelope), timeout=self._watchdog_s
-                        )
+                        async with watchdog:
+                            reply = await self.handle(envelope)
                         break
-                    except TimeoutError:
-                        self._log.critical("watchdog_timeout", timeout_s=self._watchdog_s)
-                        self._fatal_exit()
-                        return  # достижимо только в тестах, где _fatal_exit подменён
                     except Exception as exc:  # noqa: BLE001 — граница ретраев SDK: любое исключение
+                        if isinstance(exc, TimeoutError) and watchdog.expired():
+                            # Именно вотчдог: истёк наш дедлайн снаружи handle. Внутренний таймаут
+                            # БД/сети (watchdog не expired) — обычная ретраебельная ошибка ниже.
+                            self._log.critical("watchdog_timeout", timeout_s=self._watchdog_s)
+                            self._fatal_exit()
+                            return  # достижимо только в тестах, где _fatal_exit подменён
                         if attempts > len(self._retry_delays_s):
                             self._log.error(
                                 "handle_exhausted", error=repr(exc), attempts=attempts
@@ -159,14 +161,28 @@ class Agent:
                         await asyncio.sleep(delay)
 
                 if reply is not None:
-                    self._check_produces(reply.type)
-                    contracts.validate_payload(reply.type, reply.payload)
-                    out = envelope.child(
-                        producer=self.instance, type=reply.type, payload=reply.payload
-                    )
-                    # Публикация внутри спана: traceparent исходящего указывает на этот handle;
-                    # confirm внутри publish — исключение оставит конверт неподтверждённым
-                    await self._bus.publish(out)
+                    try:
+                        self._check_produces(reply.type)
+                        contracts.validate_payload(reply.type, reply.payload)
+                        out = envelope.child(
+                            producer=self.instance, type=reply.type, payload=reply.payload
+                        )
+                        # Публикация внутри спана: traceparent исходящего указывает на этот handle;
+                        # confirm внутри publish — исключение оставит конверт неподтверждённым
+                        await self._bus.publish(out)
+                    except contracts.ContractError as exc:
+                        # Reply вне контракта (тип/payload) — баг агента,
+                        # симметрично входу: task.failed + ack, не тихий вечный unacked
+                        self._log.error("reply_contract_error", reason=str(exc))
+                        await self._publish_failed(message, reason=str(exc), attempts=attempts)
+                        await message.ack()
+                        return
+                    except UnroutableEnvelope as exc:
+                        # тип в produces, но чертёж не ведёт его никуда — ошибка топологии,
+                        # чинится только чертежом: громкий выход, не тихая пропажа
+                        self._log.critical("reply_unroutable", reason=str(exc))
+                        self._fatal_exit()
+                        return
                 await message.ack()  # только после подтверждённой публикации — spec/30
 
     def _check_produces(self, type_name: str) -> None:

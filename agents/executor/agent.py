@@ -1,6 +1,6 @@
 """Тип executor: регламент + заявка → план работ + реальные проверки против target-db. Спека: 55.
 
-Мозги — LangGraph-граф (executor.graph) на GigaChat-2-Max: план → выбор проверок → исполнение →
+Мозги — LangGraph-граф (executor.graph); модель из чертежа (PoC: GigaChat-3-Ultra —
 вердикт, с настоящей развилкой. Безопасность по-взрослому (аудитория ревью — DBA):
 - LLM не пишет SQL — выбирает проверки из allowlist (executor.tools);
 - подключение к target-db — отдельная read-only роль readonly_executor (TARGET_DB_DSN), транзакции

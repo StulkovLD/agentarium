@@ -55,7 +55,9 @@ class RagAgent(Agent):
         request = ParsedRequest.model_validate(envelope.payload)  # типизированно, для запроса
         query = build_query(request)
         vector = (await asyncio.to_thread(self._embedder.embed, [query]))[0]
-        hits = self._knowledge.search(vector, limit=TOP_K, score_threshold=SCORE_THRESHOLD)
+        hits = await asyncio.to_thread(
+            self._knowledge.search, vector, limit=TOP_K, score_threshold=SCORE_THRESHOLD
+        )
         chunks = [{"text": h.text, "source": h.source, "heading": h.heading} for h in hits]
         # Блок request прокладывается ДАЛЬШЕ нетронутым (труба, spec/55): исходный payload как есть.
         return Reply(

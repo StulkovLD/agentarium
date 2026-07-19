@@ -13,7 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "agents" / "echo"))
 from agent import EchoAgent  # noqa: E402 — тип echo из каталога агентов
-from agentarium import Bus, Envelope  # noqa: E402
+from agentarium import Bus, Envelope, Reply  # noqa: E402
 from agentarium.bus import DLX, EXCHANGE, QUEUE_ARGUMENTS, UnroutableEnvelope  # noqa: E402
 
 
@@ -170,6 +170,24 @@ async def test_contract_error_fails_fast_without_retry(bus, wired):
     assert Counting.calls == 0  # до handle не дошло
     agent.stop()
     await task
+
+
+async def test_reply_contract_violation_fails_fast_not_wedged(bus, wired):
+    """Reply вне produces — task.failed + ack входа, не тихий вечный unacked (ревью-репо major)."""
+
+    class BadReply(EchoAgent):
+        async def handle(self, envelope):
+            return Reply(type="echo.done", payload={"нет_обязательного": "text"})
+
+    agent, task = run_agent(bus, wired, agent_cls=BadReply)
+    await bus.publish(make_envelope())
+    msg = await get_json(wired["failed"])
+    failed = Envelope.model_validate_json(msg.body)
+    await msg.ack()
+    assert failed.type == "task.failed"
+    agent.stop()
+    await task
+    assert (await wired["echo"].get(fail=False)) is None  # вход не подвис в accepted
 
 
 async def test_delivery_limit_dead_letters_to_dlq(bus, wired):

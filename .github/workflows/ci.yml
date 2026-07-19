@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  checks:
+  lint-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,4 +16,43 @@ jobs:
       - run: uv sync --group dev
       - run: uv run ruff check core tools tests agents demo
       - run: uv run pytest -m "not integration" -q
-  # Интеграционный ярус (services: rabbitmq/postgres/qdrant) подключается слайсами S2/S5 — spec/70.
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:4.1.8-management
+        env:
+          RABBITMQ_DEFAULT_USER: agentarium
+          RABBITMQ_DEFAULT_PASS: agentarium
+        ports: ["5672:5672", "15672:15672"]
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      postgres:
+        image: postgres:16.10
+        env:
+          POSTGRES_USER: agentarium
+          POSTGRES_PASSWORD: agentarium
+          POSTGRES_DB: agentarium
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agentarium"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      qdrant:
+        image: qdrant/qdrant:v1.18.3
+        ports: ["6333:6333"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --group dev
+      # Тесты, которым нужен живой Ollama (bge-m3, ~1.2 ГБ) или GigaChat (e2e), гейтятся
+      # graceful-skip'ом внутри самих тестов — в CI без них они пропускаются, остальная
+      # интеграция бежит на сервис-контейнерах брокера, Postgres и Qdrant.
+      - run: uv run pytest -m integration -q
+        env:
+          RABBITMQ_URL: amqp://agentarium:agentarium@localhost:5672/
+          POSTGRES_DSN: postgresql://agentarium:agentarium@localhost:5433/agentarium
+          QDRANT_URL: http://localhost:6333
