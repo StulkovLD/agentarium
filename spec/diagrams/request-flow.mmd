@@ -10,8 +10,8 @@ sequenceDiagram
     participant T as target-db
 
     U->>GW: POST /requests {text}
-    GW->>GW: trace_id · запись в Postgres (accepted)
-    GW->>BUS: Envelope type=request.new
+    GW->>BUS: Envelope type=request.new (подтверждённая публикация)
+    GW->>GW: запись в Postgres (accepted) — после публикации, см. 40
     BUS->>P: очередь parser
     P->>P: LLM: интент + сущности
     P->>BUS: request.parsed

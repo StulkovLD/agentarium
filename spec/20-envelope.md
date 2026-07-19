@@ -60,6 +60,7 @@
   "producer": "parser",
   "type": "request.parsed",
   "payload": {
+    "text": "Проверь, какие доступы у пользователя ivanov в базе billing на проде",
     "intent": "check_access",
     "entities": { "user": "ivanov", "database": "billing", "environment": "prod" }
   },
