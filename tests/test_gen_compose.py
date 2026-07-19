@@ -42,13 +42,17 @@ def test_agent_service_shape():
     assert str(HEALTH_PORT) in " ".join(echo["healthcheck"]["test"])
 
 
-def test_gateway_is_stub_without_instance():
+def test_gateway_service_builds_from_repo_root():
     _, services = _services()
     gw = services["gateway"]
     assert "AGENT_INSTANCE" not in gw["environment"]  # у шлюза нет имени экземпляра
-    assert gw["build"] == "core/gateway"  # появится в S6
-    assert "s6-todo" in gw["image"]
-    assert "S6" in gw["labels"]["agentarium.todo"]
+    # build-контекст — корень репо, Dockerfile в core/gateway: образу нужны core/agentarium и
+    # agents/ contract-модули всех типов каталога (spec/30/40), из папки core/gateway их не достать.
+    assert gw["build"] == {"context": ".", "dockerfile": "core/gateway/Dockerfile"}
+    assert "image" not in gw  # заглушки s6-todo больше нет — образ реальный
+    assert "labels" not in gw
+    assert gw["volumes"] == [f"./{CONFIG}:{MOUNT_TARGET}:ro"]  # чертёж смонтирован read-only
+    assert str(HEALTH_PORT) in " ".join(gw["healthcheck"]["test"])
 
 
 def test_header_documents_explicit_merge():

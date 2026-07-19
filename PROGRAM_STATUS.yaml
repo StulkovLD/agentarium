@@ -8,7 +8,7 @@ gates:
     status: closed_accepted   # бумага принята владельцем 2026-07-19 после 4 раундов кросс-модельного ревью + финального сеньор-взгляда
     seal: 0c5561170463b8701b18db271b3f025a0ef964df
   G1-core-built:       # слайсы S1-S6 закрыты
-    status: pending
+    status: open       # код ядра готов целиком; закрытие держит только live-smoke GigaChat — ждёт ключ владельца в .env
   G2-poc-live:         # S8 закрыт: обе конфигурации живы. Допустимые статусы гейтов: pending|open|closed_accepted|skipped (skipped — только решением release cut, см. spec/70)
     status: pending
   G3-release:          # S9 закрыт, финальный прогон на чистом клоне
@@ -20,7 +20,7 @@ slices:
   S3-topology: done   # рубеж 1 целиком, apply с реконсиляцией и дренажом, генератор, echo→reverse по чертежу
   S4-observability: done   # водопад подтверждён живым Jaeger API
   S5-storage: done   # 54 unit + 21 integration; паспорт id=0, инжест идемпотентен; хост-порт pg → 5433
-  S6-gateway: pending
+  S6-gateway: done   # шлюз универсален, образ собран, 62 unit + 27 integration; e2e echo-цепочка зелёная
   S7-poc-demo-resilience: pending
   S8-extended-config: pending
   S9-polish-release: pending

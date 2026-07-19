@@ -19,7 +19,9 @@ HEALTH_PORT = 8000
 
 MOUNT_TARGET = "/etc/agentarium/topology.yaml"  # куда монтируется чертёж внутрь контейнера
 GATEWAY = "gateway"
-GATEWAY_BUILD = "core/gateway"  # появится в S6 — сейчас заглушка
+# Образ шлюза: build-контекст — КОРЕНЬ репо (Dockerfile тянет core/agentarium + agents/ contract-
+# модули всех типов каталога, spec/30/40), а не папка core/gateway — из неё `..` за контекст закрыт.
+GATEWAY_BUILD = {"context": ".", "dockerfile": "core/gateway/Dockerfile"}
 
 _MERGE_HINT = (
     "docker compose -f docker-compose.yml -f docker-compose.agents.yml up -d --wait"
@@ -59,7 +61,7 @@ def _host_path(path: str) -> str:
     return f"./{path}"
 
 
-def _service(*, build: str, instance: str | None, config_path: str) -> dict:
+def _service(*, build: str | dict, instance: str | None, config_path: str) -> dict:
     environment = {"AGENTARIUM_CONFIG": MOUNT_TARGET}
     if instance is not None:
         environment["AGENT_INSTANCE"] = instance  # шлюз имени экземпляра не имеет
@@ -80,16 +82,14 @@ def build_compose(
     catalog: dict[str, CatalogType],
     config_path: str,
 ) -> dict:
-    """Собрать словарь compose: сервис на каждый экземпляр + сервис gateway (заглушка до S6)."""
+    """Собрать словарь compose: сервис на каждый экземпляр + сервис gateway (spec/40)."""
     services: dict[str, dict] = {}
     for name, inst in topo.agents.items():
         services[name] = _service(
             build=catalog[inst.type].build, instance=name, config_path=config_path
         )
-    gateway = _service(build=GATEWAY_BUILD, instance=None, config_path=config_path)
-    gateway["image"] = "agentarium/gateway:s6-todo"  # заглушка: реальный образ в S6
-    gateway["labels"] = {"agentarium.todo": "S6 — образ шлюза (core/gateway) появится в слайсе S6"}
-    services[GATEWAY] = gateway
+    # Шлюз имени экземпляра не имеет; образ — из корня репо по core/gateway/Dockerfile.
+    services[GATEWAY] = _service(build=GATEWAY_BUILD, instance=None, config_path=config_path)
     return {"services": services}
 
 
