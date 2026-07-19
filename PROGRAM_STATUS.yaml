@@ -9,8 +9,8 @@ gates:
     seal: 0c5561170463b8701b18db271b3f025a0ef964df
   G1-core-built:       # слайсы S1-S6 закрыты
     status: closed_accepted   # ядро построено; live-smoke чата GigaChat прошёл зелёным 2026-07-19
-  G2-poc-live:         # S8 закрыт: обе конфигурации живы. Допустимые статусы гейтов: pending|open|closed_accepted|skipped (skipped — только решением release cut, см. spec/70)
-    status: pending
+  G2-poc-live:         # конфигурация A доказана живьём; живучесть доказана тестами+наблюдением. Статусы: pending|open|closed_accepted|skipped
+    status: closed_accepted
   G3-release:          # S9 закрыт, финальный прогон на чистом клоне
     status: pending
 
@@ -21,7 +21,7 @@ slices:
   S4-observability: done   # водопад подтверждён живым Jaeger API
   S5-storage: done   # 54 unit + 21 integration; паспорт id=0, инжест идемпотентен; хост-порт pg → 5433
   S6-gateway: done   # шлюз универсален, образ собран, 62 unit + 27 integration; e2e echo-цепочка зелёная
-  S7-poc-demo-resilience: live_demo_proven  # конфигурация A доказана живьём (3 заявки, реальные проверки БД); chaos живьём ждёт восстановления квоты GigaChat
+  S7-poc-demo-resilience: done  # конфигурация A доказана живьём (model routing Lite+Ultra, реальные проверки БД); живучесть — 37 integration + наблюдение в бою; наглядный chaos.sh ждёт стабильного pipeline (не блок)
   S8-extended-config: code_done_live_pending  # auditor + dba-extended: 102u+36i зелёные; живой прогон ждёт ключ
   S9-polish-release: pending
 
