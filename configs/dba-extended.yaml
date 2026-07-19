@@ -17,7 +17,8 @@ agents:                         # реестр экземпляров: имя �
   executor:
     type: executor
     target_db: env:TARGET_DB_DSN
-    model: { provider: gigachat, name: GigaChat-2-Max }
+    # executor — тяжёлый узел (планирование + structured output выбора проверок): нужна сильная модель.
+    model: { provider: gigachat, name: GigaChat-3-Ultra }
   auditor:                      # новый тип из каталога (S8): план → сверка с историей инцидентов
     type: auditor
     collection: incidents

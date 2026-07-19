@@ -21,7 +21,7 @@
 | gateway | сервис ядра | нет | вход/выход по HTTP-контракту из 40; исполняет `entry` и `finals` чертежа |
 | parser | `parser` | langchain-gigachat, structured output | текст → интент + сущности; не-заявка → отказ |
 | knowledge | `rag` | эмбеддинги из чертежа (PoC: bge-m3/Ollama) + GigaChat | интент + сущности → фрагменты регламентов из Qdrant |
-| executor | `executor` | **LangGraph** + GigaChat-2-Max | регламент + заявка → план работ + реальные проверки против target-db |
+| executor | `executor` | **LangGraph** + GigaChat-3-Ultra (модель из чертежа; тяжёлый узел — слабые модели не тянут structured-выбор проверок) | регламент + заявка → план работ + реальные проверки против target-db |
 | auditor (конфигурация B) | `auditor` | эмбеддинги из чертежа (PoC: bge-m3/Ollama) + GigaChat | план → сверка с историей инцидентов |
 
 LLM-фреймворки по-честному: LangGraph стоит там, где есть граф (executor: план → проверки → вердикт, с ветвлением); parser и knowledge — прямые вызовы langchain-gigachat, граф из одного узла был бы золочением.

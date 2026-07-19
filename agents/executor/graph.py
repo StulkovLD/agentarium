@@ -80,7 +80,10 @@ def _regulations(chunks: list[dict[str, Any]]) -> str:
 _PLAN_SYS = (
     "Ты — исполнитель заявок DBA. По заявке и найденным регламентам составь план работ и выбери "
     "проверки, подтверждающие исходное состояние target-db. Проверки — ТОЛЬКО из allowlist "
-    "(ниже), SQL писать нельзя. Аргументы бери из сущностей заявки.\n\nAllowlist проверок:\n"
+    "(ниже), SQL писать нельзя. Аргументы бери из сущностей заявки.\n"
+    "ОБЯЗАТЕЛЬНО заполни поле checks минимум одной проверкой — пустой список запрещён: без фактов "
+    "заявку не закрыть. Для check_access — user_roles и user_privileges; для update_db_version "
+    "— pg_version; всегда добавляй проверки под интент.\n\nAllowlist проверок:\n"
     + tools.catalog_description()
 )
 
@@ -171,7 +174,8 @@ def build_graph(llm: Any, run_check: CheckRunner):
 
 def _selection(check: CheckSelection) -> dict[str, Any]:
     name = check.name.value if isinstance(check.name, Enum) else check.name
-    args = {k: v for k, v in (("user", check.user), ("database", check.database)) if v is not None}
+    # пустую строку модель шлёт для нерелевантных полей — отсекаем как отсутствие (не только None)
+    args = {k: v for k, v in (("user", check.user), ("database", check.database)) if v}
     return {"name": name, "args": args}
 
 
