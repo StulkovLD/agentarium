@@ -22,6 +22,11 @@ gen:
 apply:
 	uv run python -m agentarium apply configs/$(CONFIG).yaml
 
-# Цели ниже наполняются слайсами S5–S7 (spec/70). До того — честный отказ, не заглушка-обманка.
-up demo seed test-e2e:
+# seed — проиндексировать базу знаний в Qdrant (spec/45). COLLECTION=all по умолчанию.
+# Читает секцию collections чертежа CONFIG. В make up (S7) встроен ПОСЛЕ инфраструктуры, до агентов.
+seed:
+	uv run python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
+
+# Цели ниже наполняются слайсами S6–S7 (spec/70). До того — честный отказ, не заглушка-обманка.
+up demo test-e2e:
 	@echo "цель '$@' появится в своём слайсе roadmap (spec/70) — сейчас фаза: см. PROGRAM_STATUS.yaml" && exit 1

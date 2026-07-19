@@ -1,0 +1,28 @@
+# configs/storage-test.yaml — тестовый чертёж слайса S5 (spec/70).
+# Минимальный валидный чертёж (цепочка echo → reverse из каталога S3) + секция collections:
+# инжест читает её через штатный лоадер чертежа (spec/45). Провайдер эмбеддингов — 'stub':
+# его знает только детерминированный дубль тестов, прод-фабрика такого провайдера не индексирует.
+system: storage-test
+
+entry: echo.request
+
+agents:
+  echo:
+    type: echo
+  reverse:
+    type: reverse
+
+collections:                      # общие коллекции знаний: владелец паспорта эмбеддингов (spec/45)
+  test-docs:
+    source: knowledge/test-docs
+    embeddings: { provider: stub, model: hash-256 }
+
+routes:
+  echo.request: [echo]
+  echo.done:    [reverse]
+  reverse.done: [gateway]
+  task.failed:  [gateway]
+
+finals:
+  reverse.done: complete
+  task.failed:  fail

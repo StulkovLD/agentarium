@@ -1,6 +1,6 @@
-# Статичная инфраструктура платформы. Владелец: шина RabbitMQ (spec/05, spec/40, spec/50).
-# Только rabbitmq — Postgres и Qdrant приносит слайс S5 (spec/70), сюда до тех пор не добавлять.
-# Одной командой: docker compose up -d --wait rabbitmq
+# Статичная инфраструктура платформы: шина RabbitMQ, трейсы Jaeger, склады Postgres + Qdrant.
+# Владельцы: шина — spec/40/50; склады — spec/45. target-db («пациент» PoC) приходит в S7, не здесь.
+# Одной командой: docker compose up -d --wait rabbitmq postgres qdrant
 services:
   rabbitmq:
     image: rabbitmq:4.1.8-management   # ветка 4.x + management-плагин; патч запинен — проверенный тег (spec/05)
@@ -40,5 +40,46 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16.10   # PostgreSQL 16 (spec/05); патч запинен — воспроизводимая миграция
+    container_name: agentarium-postgres
+    environment:
+      POSTGRES_USER: agentarium       # совпадает с env.example (POSTGRES_DSN)
+      POSTGRES_PASSWORD: agentarium
+      POSTGRES_DB: agentarium
+    ports:
+      - "5433:5432"   # наружу 5433: не претендуем на дефолтный порт — у разработчиков часто живёт свой postgres
+    healthcheck:
+      # pg_isready — узел принимает соединения; --wait ждёт именно этого до старта агентов/шлюза
+      test: ["CMD-SHELL", "pg_isready -U agentarium -d agentarium"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+    volumes:
+      # durable-стор заявок: перезапуск Postgres не съедает историю requests (spec/45)
+      - postgres-data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.3   # склад векторов (spec/05); версия запинена — major.minor совпадает с qdrant-client (иначе клиент ругается на несовместимость)
+    container_name: agentarium-qdrant
+    ports:
+      - "6333:6333"   # REST + dashboard: паспорт коллекции точкой id=0, поиск знаний (spec/45)
+      - "6334:6334"   # gRPC — быстрый путь клиента qdrant-client
+    healthcheck:
+      # в образе есть bash, нет curl/wget: TCP-connect на 6333 — порт открыт только когда узел готов
+      test: ["CMD-SHELL", "bash -c ': > /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+    volumes:
+      # durable-стор коллекций: перезапуск Qdrant не требует переиндексации знаний (spec/45)
+      - qdrant-data:/qdrant/storage
+
 volumes:
   rabbitmq-data:
+  postgres-data:
+  qdrant-data:

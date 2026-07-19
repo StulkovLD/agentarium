@@ -19,7 +19,7 @@ slices:
   S2-bus-sdk: done   # SDK-эталон + инфра: 9 интеграционных тестов на живом брокере, 10 юнитов
   S3-topology: done   # рубеж 1 целиком, apply с реконсиляцией и дренажом, генератор, echo→reverse по чертежу
   S4-observability: done   # водопад подтверждён живым Jaeger API
-  S5-storage: pending
+  S5-storage: done   # 54 unit + 21 integration; паспорт id=0, инжест идемпотентен; хост-порт pg → 5433
   S6-gateway: pending
   S7-poc-demo-resilience: pending
   S8-extended-config: pending
