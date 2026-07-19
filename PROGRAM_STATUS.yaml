@@ -1,12 +1,12 @@
 # Единственный источник фазы, версии и гейтов. Меняется чаще всех — потому отдельный файл.
 program: agentarium
-version: 0.0.0        # MAJOR — пивот точки Б · MINOR — принятая итерация «спека+код» · PATCH — фикс кода без изменения бумаги
-phase: paper_converged  # 3 раунда кросс-модельного ревью пройдены, правки вращены; стройка на паузе по директиве владельца
+version: 0.1.0        # MAJOR — пивот точки Б · MINOR — принятая итерация «спека+код» · PATCH — фикс кода без изменения бумаги
+phase: build            # бумага принята владельцем, идёт имплементация по spec/70-roadmap.md
 
 gates:
   G0-paper-accepted:
-    status: open       # закрывается ревью G0 (тройное кросс-модельное ревью пройдено, правки вращены; ждёт слова владельца); при закрытии: seal = коммит принятия, version -> 0.1.0
-    seal: null
+    status: closed_accepted   # бумага принята владельцем 2026-07-19 после 4 раундов кросс-модельного ревью + финального сеньор-взгляда
+    seal: 0c5561170463b8701b18db271b3f025a0ef964df
   G1-core-built:       # слайсы S1-S6 закрыты
     status: pending
   G2-poc-live:         # S8 закрыт: обе конфигурации живы. Допустимые статусы гейтов: pending|open|closed_accepted|skipped (skipped — только решением release cut, см. spec/70)
@@ -26,6 +26,6 @@ slices:
   S9-polish-release: pending
 
 authorized:
-  implementation: false   # откроется гейтом G0
+  implementation: true    # открыто гейтом G0
   github_push: true
   publish_repo: false     # публичным репо становится только перед сдачей
