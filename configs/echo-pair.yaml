@@ -1,0 +1,22 @@
+# configs/echo-pair.yaml — тестовый чертёж слайса S3 (spec/70).
+# Цепочка echo → reverse: конверт проходит два тривиальных типа и завершается в gateway.
+# Шлюза-потребителя очереди gateway ещё нет — он приходит в S6; до тех пор очередь просто ждёт.
+system: echo-pair
+
+entry: echo.request               # тип, который шлюз публикует на POST /requests
+
+agents:                           # реестр экземпляров: имя → тип из каталога (+ конфиг по схеме типа)
+  echo:
+    type: echo
+  reverse:
+    type: reverse
+
+routes:                           # маршруты: тип конверта → очереди экземпляров/шлюза
+  echo.request: [echo]
+  echo.done:    [reverse]
+  reverse.done: [gateway]
+  task.failed:  [gateway]
+
+finals:                           # финалы: как шлюзу завершать заявку
+  reverse.done: complete
+  task.failed:  fail
