@@ -62,7 +62,7 @@
 
 | Команда | Что делает |
 |---|---|
-| `make up [CONFIG=…]` | вся система одной командой, строго в порядке: gen (файлы) → инфраструктура up + wait → topology apply (exchange/очереди/биндинги — брокер уже жив) → seed → агенты up (знания раньше агентов — иначе паспорт-сверка уронит rag). Compose собирается явно: `-f docker-compose.yml -f docker-compose.agents.yml` |
+| `make up [CONFIG=…]` | вся система одной командой, строго в порядке: gen (файлы) → инфраструктура up + wait → topology apply (exchange/очереди/биндинги — брокер уже жив) → seed → агенты и шлюз up (знания раньше агентов — иначе паспорт-сверка уронит rag; шлюз после apply — иначе его очереди ещё нет). Compose собирается явно: `-f docker-compose.yml -f docker-compose.agents.yml` |
 | `make gen [CONFIG=…]` | чертёж → валидация рубежа 1 + docker-compose.agents.yml. Только файлы: с живым брокером не разговаривает |
 | `make demo [CONFIG=…]` | полный цикл: `make up CONFIG=…` + прогон демо-заявок. Требует живой ключ GigaChat. Смена CONFIG пересобирает систему, включая шлюз |
 | `make seed [COLLECTION=…]` | проиндексировать базу знаний в Qdrant (по умолчанию все) |
