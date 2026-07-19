@@ -1,0 +1,27 @@
+# Статичная инфраструктура платформы. Владелец: шина RabbitMQ (spec/05, spec/40, spec/50).
+# Только rabbitmq — Postgres и Qdrant приносит слайс S5 (spec/70), сюда до тех пор не добавлять.
+# Одной командой: docker compose up -d --wait rabbitmq
+services:
+  rabbitmq:
+    image: rabbitmq:4.1.8-management   # ветка 4.x + management-плагин; патч запинен — проверенный тег (spec/05)
+    container_name: agentarium-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: agentarium   # совпадает с env.example (RABBITMQ_URL)
+      RABBITMQ_DEFAULT_PASS: agentarium
+    ports:
+      - "5672:5672"     # AMQP — шина
+      - "15672:15672"   # management UI + HTTP API (smoke-сверка аргументов очередей, spec/40)
+    healthcheck:
+      # check_port_connectivity — узел загружен и слушатели принимают соединения; --wait ждёт именно этого
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    volumes:
+      # durable-стор quorum-очередей: перезапуск брокера не съедает конверты (слой «Публикация», spec/50)
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq-data:

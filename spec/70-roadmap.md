@@ -22,7 +22,7 @@
 
 - **Вход:** S1.
 - **Работа:** клиент шины (aio-pika, quorum-очереди с delivery-limit, persistent + publisher confirms, порядок publish→confirm→ack, ретраи 1s/3s/9s, `task.failed`, DLX → dlq); класс `Agent` (петля жизненного цикла, манифест, схемы payload, `/health` = процесс+шина, вотчдог, graceful shutdown); echo-агент для тестов.
-- **Выход:** `AGENT_INSTANCE=echo python -m agentarium run` живёт против RabbitMQ.
+- **Выход:** echo-агент живёт против RabbitMQ (программный запуск в интеграционных тестах; CLI `AGENT_INSTANCE=… python -m agentarium run` появляется в S3 — ему нужен чертёж, которого в S2 по стоп-правилу нет).
 - **Тесты:** интеграционные с RabbitMQ как сервис-контейнером (бегут в CI): доставка, ack только после confirm, публикация в тип без маршрута → return-ошибка (mandatory), возврат неподтверждённого, ретраи, `task.failed` после исчерпания, delivery-limit → dlq, kill echo → конверт дожил.
 - **Стоп:** без topology — биндинги в тестах руками; без LLM. Жертвуемое первым при срыве сроков: вотчдог → soft-timeout с громким логом.
 

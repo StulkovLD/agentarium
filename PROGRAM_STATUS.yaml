@@ -16,7 +16,7 @@ gates:
 
 slices:
   S1-skeleton-envelope: done   # 10 контрактных тестов, ruff чист, схема экспортирована
-  S2-bus-sdk: pending
+  S2-bus-sdk: done   # SDK-эталон + инфра: 9 интеграционных тестов на живом брокере, 10 юнитов
   S3-topology: pending
   S4-observability: pending
   S5-storage: pending
