@@ -11,8 +11,8 @@ gates:
     status: closed_accepted   # ядро построено; live-smoke чата GigaChat прошёл зелёным 2026-07-19
   G2-poc-live:         # конфигурация A доказана живьём; живучесть доказана тестами+наблюдением. Статусы: pending|open|closed_accepted|skipped
     status: closed_accepted
-  G3-release:          # S9 закрыт, финальный прогон на чистом клоне
-    status: pending
+  G3-release:          # чистый клон собирается (uv sync+ruff+110 unit+LICENSE ✓); полный make demo на клоне ждёт восстановления квоты GigaChat
+    status: open
 
 slices:
   S1-skeleton-envelope: done   # 10 контрактных тестов, ruff чист, схема экспортирована
@@ -23,7 +23,7 @@ slices:
   S6-gateway: done   # шлюз универсален, образ собран, 62 unit + 27 integration; e2e echo-цепочка зелёная
   S7-poc-demo-resilience: done  # конфигурация A доказана живьём (model routing Lite+Ultra, реальные проверки БД); живучесть — 37 integration + наблюдение в бою; наглядный chaos.sh ждёт стабильного pipeline (не блок)
   S8-extended-config: code_done_live_pending  # auditor + dba-extended: 102u+36i зелёные; живой прогон ждёт ключ
-  S9-polish-release: pending
+  S9-polish-release: in_progress  # витрина+LICENSE+CI-ярус готовы, находки ревью репо закрыты, чистый клон собирается; полный e2e-демо клона и chaos-запись ждут квоту GigaChat
 
 authorized:
   implementation: true    # открыто гейтом G0
