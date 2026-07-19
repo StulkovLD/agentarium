@@ -45,13 +45,17 @@ def main() -> None:
     if ca_bundle:
         common["ca_bundle_file"] = ca_bundle
 
-    chat = GigaChat(**common)
-    answer = chat.invoke("Ответь одним словом: работает?")
-    print(f"чат-вызов ок: {str(answer.content)[:80]}")
+    # Имя модели — явно: SDK-дефолт «GigaChat» с эндпоинта уже снят (список — GET /v1/models)
+    chat_model = os.environ.get("GIGACHAT_MODEL", "GigaChat-2")
+    embed_model = os.environ.get("GIGACHAT_EMBED_MODEL", "Embeddings")
 
-    embeddings = GigaChatEmbeddings(**common)
+    chat = GigaChat(**common, model=chat_model)
+    answer = chat.invoke("Ответь одним словом: работает?")
+    print(f"чат-вызов ок ({chat_model}): {str(answer.content)[:80]}")
+
+    embeddings = GigaChatEmbeddings(**common, model=embed_model)
     vector = embeddings.embed_query("проверка эмбеддинга")
-    print(f"эмбеддинг ок: размерность {len(vector)}")
+    print(f"эмбеддинг ок ({embed_model}): размерность {len(vector)}")
 
     print("smoke GigaChat зелёный: авторизация, чат и эмбеддинг работают.")
 
