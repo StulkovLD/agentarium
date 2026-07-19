@@ -6,17 +6,16 @@ Ack входа — только после подтверждённой публ
 """
 
 import asyncio
-import logging
 import os
 import uuid
 
+import structlog
 from aio_pika.abc import AbstractIncomingMessage
+from opentelemetry.trace import SpanKind
 
-from agentarium import contracts
+from agentarium import contracts, observability
 from agentarium.bus import Bus
 from agentarium.envelope import Envelope, Reply
-
-log = logging.getLogger("agentarium.agent")
 
 WATCHDOG_DEFAULT_S = 120.0
 RETRY_DELAYS_S = (1.0, 3.0, 9.0)
@@ -50,6 +49,7 @@ class Agent:
         self._retry_delays_s = retry_delays_s
         self._stopping = asyncio.Event()
         self._current: asyncio.Task | None = None
+        self._log = observability.get_logger(instance)  # ключ agent привязан ко всем строкам
 
     async def handle(self, envelope: Envelope) -> Reply | None:  # мозги — дело наследника
         raise NotImplementedError
@@ -58,9 +58,10 @@ class Agent:
 
     async def run(self) -> None:
         """Петля потребления. Очередь уже объявлена владельцем (topology apply) — passive."""
+        observability.configure(self.instance)  # логи + трейсы бесплатно любому агенту (spec/50)
         queue = await self._bus.channel.get_queue(self._queue_name, ensure=False)
         consumer_tag = await queue.consume(self._on_message, no_ack=False)
-        log.info("agent %s consuming %s", self.instance, self._queue_name)
+        self._log.info("consuming", queue=self._queue_name)
         await self._stopping.wait()
         await queue.cancel(consumer_tag)
         if self._current is not None:
@@ -83,40 +84,79 @@ class Agent:
             self._current = None
 
     async def _process(self, message: AbstractIncomingMessage) -> None:
-        try:
-            envelope = Envelope.model_validate_json(message.body)
-            contracts.validate_payload(envelope.type, envelope.payload)
-        except (ValueError, contracts.ContractError) as exc:
-            # Ошибка контракта не ретраится: task.failed с первой попытки (spec/50)
-            await self._publish_failed(message, reason=str(exc), attempts=1)
-            await message.ack()
-            return
-
-        attempts = 0
-        while True:
-            attempts += 1
+        # Родительский спан — из AMQP-заголовков конверта: N обработок склеиваются в один
+        # водопад через traceparent (spec/50). В теле конверта контекста нет (spec/20).
+        parent = observability.extract_context(message.headers)
+        with observability.get_tracer().start_as_current_span(
+            "agent.handle", context=parent, kind=SpanKind.CONSUMER
+        ) as span:
             try:
-                reply = await asyncio.wait_for(self.handle(envelope), timeout=self._watchdog_s)
-                break
-            except TimeoutError:
-                log.critical("watchdog: handle дольше %.0fs — громкий выход", self._watchdog_s)
-                self._fatal_exit()
-                return  # достижимо только в тестах, где _fatal_exit подменён
-            except Exception as exc:  # noqa: BLE001 — граница ретраев SDK: любое исключение мозгов
-                if attempts > len(self._retry_delays_s):
-                    await self._publish_failed(message, reason=repr(exc), attempts=attempts)
+                envelope = Envelope.model_validate_json(message.body)
+            except ValueError as exc:
+                # Тело нечитаемо — контрактная ошибка: task.failed без ретраев (spec/50)
+                span.set_attribute("attempt", 1)
+                self._log.warning("contract_error", reason=str(exc), attempt=1)
+                await self._publish_failed(message, reason=str(exc), attempts=1)
+                await message.ack()
+                return
+
+            span.set_attribute("producer", envelope.producer)
+            span.set_attribute("type", envelope.type)
+            span.set_attribute("envelope.id", str(envelope.id))
+            span.set_attribute("trace_id", str(envelope.trace_id))
+
+            with structlog.contextvars.bound_contextvars(
+                trace_id=str(envelope.trace_id), type=envelope.type
+            ):
+                try:
+                    contracts.validate_payload(envelope.type, envelope.payload)
+                except contracts.ContractError as exc:
+                    # Невалидный payload не ретраится — это баг, повтор не чинит (spec/50)
+                    span.set_attribute("attempt", 1)
+                    self._log.warning("contract_error", reason=str(exc), attempt=1)
+                    await self._publish_failed(message, reason=str(exc), attempts=1)
                     await message.ack()
                     return
-                delay = self._retry_delays_s[attempts - 1]
-                log.warning("attempt %d failed (%r), retry in %.1fs", attempts, exc, delay)
-                await asyncio.sleep(delay)
 
-        if reply is not None:
-            self._check_produces(reply.type)
-            contracts.validate_payload(reply.type, reply.payload)
-            out = envelope.child(producer=self.instance, type=reply.type, payload=reply.payload)
-            await self._bus.publish(out)  # confirm внутри; исключение → конверт не ack-ается
-        await message.ack()  # только после подтверждённой публикации — spec/30
+                attempts = 0
+                while True:
+                    attempts += 1
+                    span.set_attribute("attempt", attempts)
+                    try:
+                        reply = await asyncio.wait_for(
+                            self.handle(envelope), timeout=self._watchdog_s
+                        )
+                        break
+                    except TimeoutError:
+                        self._log.critical("watchdog_timeout", timeout_s=self._watchdog_s)
+                        self._fatal_exit()
+                        return  # достижимо только в тестах, где _fatal_exit подменён
+                    except Exception as exc:  # noqa: BLE001 — граница ретраев SDK: любое исключение
+                        if attempts > len(self._retry_delays_s):
+                            self._log.error(
+                                "handle_exhausted", error=repr(exc), attempts=attempts
+                            )
+                            await self._publish_failed(
+                                message, reason=repr(exc), attempts=attempts
+                            )
+                            await message.ack()
+                            return
+                        delay = self._retry_delays_s[attempts - 1]
+                        self._log.warning(
+                            "handle_retry", attempt=attempts, error=repr(exc), retry_in_s=delay
+                        )
+                        await asyncio.sleep(delay)
+
+                if reply is not None:
+                    self._check_produces(reply.type)
+                    contracts.validate_payload(reply.type, reply.payload)
+                    out = envelope.child(
+                        producer=self.instance, type=reply.type, payload=reply.payload
+                    )
+                    # Публикация внутри спана: traceparent исходящего указывает на этот handle;
+                    # confirm внутри publish — исключение оставит конверт неподтверждённым
+                    await self._bus.publish(out)
+                await message.ack()  # только после подтверждённой публикации — spec/30
 
     def _check_produces(self, type_name: str) -> None:
         if type_name not in self.produces:

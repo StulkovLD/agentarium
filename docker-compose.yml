@@ -23,5 +23,22 @@ services:
       # durable-стор quorum-очередей: перезапуск брокера не съедает конверты (слой «Публикация», spec/50)
       - rabbitmq-data:/var/lib/rabbitmq
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0   # all-in-one с пином патча — воспроизводимый водопад (spec/50)
+    container_name: agentarium-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"   # приём OTLP на 4317 (gRPC) и 4318 (HTTP) — SDK шлёт по gRPC
+    ports:
+      - "16686:16686"   # web-UI: путь заявки через агентов виден как водопад, поиск по trace_id
+      - "4317:4317"     # OTLP gRPC — цель OTEL_EXPORTER_OTLP_ENDPOINT агентов (env.example)
+    healthcheck:
+      # 14269 — admin-порт коллектора: `{"status":"Server available"}`, когда приём телеметрии готов
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   rabbitmq-data:

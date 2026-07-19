@@ -8,6 +8,7 @@
 import aio_pika
 from aio_pika.abc import AbstractRobustChannel, AbstractRobustConnection
 
+from agentarium import observability
 from agentarium.envelope import Envelope
 
 EXCHANGE = "agentarium"
@@ -61,12 +62,16 @@ class Bus:
     async def publish(self, envelope: Envelope, *, exchange: str = EXCHANGE) -> None:
         """Подтверждённая публикация. Возврат из метода = брокер принял и смаршрутизировал."""
         ex = await self.channel.get_exchange(exchange, ensure=False)
+        # Бизнес-нить (trace_id) и W3C-контекст спана (traceparent) едут транспортом, не в теле:
+        # в конверте контекста нет, склейка спанов — дело SDK (spec/20, spec/50).
+        headers: dict[str, str] = {"trace_id": str(envelope.trace_id)}
+        observability.inject_headers(headers)
         message = aio_pika.Message(
             body=envelope.model_dump_json().encode(),
             content_type="application/json",
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             message_id=str(envelope.id),
-            headers={"trace_id": str(envelope.trace_id)},
+            headers=headers,
         )
         try:
             await ex.publish(message, routing_key=envelope.type, mandatory=True)
