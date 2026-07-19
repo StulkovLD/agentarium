@@ -93,7 +93,7 @@ services:
         ollama pull bge-m3
         wait $$pid
     ports:
-      - "11434:11434"   # REST API: платформа ходит по HTTP (POST /api/embed), base_url из чертежа (spec/45)
+      - "11534:11434"   # наружу 11534: не претендуем на дефолтный порт — на хостах разработчиков часто живёт свой Ollama
     healthcheck:
       # зелёно, лишь когда bge-m3 подгружена: ollama show требует и живого serve, и наличия модели
       test: ["CMD-SHELL", "ollama show bge-m3 >/dev/null 2>&1"]

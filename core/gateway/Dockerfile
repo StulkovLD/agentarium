@@ -21,6 +21,7 @@ RUN uv sync --frozen --no-dev   # main-зависимости + agentarium; dev 
 # env.example — для fail-fast секретов на старте (secrets.check_secrets).
 COPY core/gateway ./gateway
 COPY agents ./agents
+COPY infra/certs ./infra/certs
 COPY env.example ./env.example
 
 ENV PATH="/app/.venv/bin:$PATH" \

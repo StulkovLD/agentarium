@@ -21,6 +21,7 @@ RUN uv sync --frozen --no-dev --extra brains
 
 # Код всех типов + бандл contract-модулей каталога (spec/30). Мозги других типов — ленивы, не тянутся.
 COPY agents ./agents
+COPY infra/certs ./infra/certs
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app \

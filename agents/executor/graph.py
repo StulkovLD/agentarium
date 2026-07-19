@@ -29,10 +29,17 @@ CheckRunner = Callable[[str, dict[str, Any]], Awaitable[list[dict[str, Any]]]]
 
 
 class CheckSelection(BaseModel):
+    """Одна проверка из allowlist. Аргументы — плоскими полями: заполни те, что нужны проверке."""
+
     model_config = ConfigDict(extra="forbid")
 
     name: CheckName = Field(description="Имя проверки из allowlist")
-    args: dict[str, Any] = Field(default_factory=dict, description="Аргументы проверки")
+    user: str | None = Field(
+        default=None, description="Имя пользователя — для user_roles и user_privileges"
+    )
+    database: str | None = Field(
+        default=None, description="Имя базы — для user_privileges и db_size"
+    )
 
 
 class PlanOutput(BaseModel):
@@ -45,6 +52,8 @@ class PlanOutput(BaseModel):
 
 
 class VerdictOutput(BaseModel):
+    """Вердикт по заявке: сопоставление плана с фактами выполненных проверок."""
+
     model_config = ConfigDict(extra="forbid")
 
     verdict: str = Field(description="Вердикт: вывод по заявке с учётом фактов проверок")
@@ -162,14 +171,16 @@ def build_graph(llm: Any, run_check: CheckRunner):
 
 def _selection(check: CheckSelection) -> dict[str, Any]:
     name = check.name.value if isinstance(check.name, Enum) else check.name
-    return {"name": name, "args": check.args}
+    args = {k: v for k, v in (("user", check.user), ("database", check.database)) if v is not None}
+    return {"name": name, "args": args}
 
 
 async def _execute_one(run_check: CheckRunner, sel: dict[str, Any]) -> dict[str, Any]:
-    """Выполнить одну проверку. Ошибка аргументов/allowlist — в result, не крах заявки: она видна
-    вердикту и питает развилку пересборки (ошибка не проглатывается, а становится фактом)."""
+    """Выполнить одну проверку. Ошибка — в result, не крах заявки: и неверные аргументы, и
+    операционный отказ БД (нет такой базы, недоступна) это ФАКТ для вердикта, а не баг агента.
+    Факт питает развилку пересборки; сырого SQL нет — ронять весь handle нечему."""
     try:
         result: Any = await run_check(sel["name"], sel["args"])
-    except (tools.UnknownCheck, ValueError) as exc:
-        result = {"error": str(exc)}
+    except Exception as exc:  # noqa: BLE001 — результат проверки против живой БД, включая её отказ
+        result = {"error": f"{type(exc).__name__}: {exc}"}
     return {"name": sel["name"], "args": sel["args"], "result": result}

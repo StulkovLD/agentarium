@@ -14,7 +14,7 @@ COMPOSE := docker compose -f docker-compose.yml -f docker-compose.agents.yml
 INFRA := rabbitmq postgres qdrant jaeger ollama target-db
 LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
-LOCAL_OLLAMA := http://localhost:11434
+LOCAL_OLLAMA := http://localhost:11534
 
 .PHONY: test test-integration test-e2e lint gen apply up demo seed
 
