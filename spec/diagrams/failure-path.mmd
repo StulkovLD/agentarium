@@ -1,0 +1,20 @@
+%% Путь конверта при аварии — живучесть как маршрут, а не обещание. Проекция спеков 30/40/50.
+flowchart TB
+    A[конверт взят агентом<br/>prefetch=1, unacked] --> B{handle}
+    B -- успех --> C[publish + confirm<br/>mandatory] --> D[ack входа] --> E([конверт доехал])
+    B -- ошибка LLM/сети --> R[ретраи в процессе<br/>1s → 3s → 9s, конверт unacked]
+    R -- взялось --> C
+    R -- исчерпано --> F[публикация task.failed<br/>подтверждённая] --> D2[ack входа] --> G[маршрут task.failed → gateway<br/>заявка честно failed]
+    F -.->|wildcard *.failed| Q[(agentarium.dlq)]
+
+    B -- краш процесса<br/>вотчдог / kill python --> H[конверт возвращается в очередь<br/>x-delivery-limit считает]
+    H -- restart: unless-stopped --> A
+    H -- 3 доставки исчерпаны --> X[agentarium.dlx<br/>fanout · at-least-once] --> Q
+    Q --> K[dlq-консюмер шлюза<br/>заявка failed по trace_id]
+
+    subgraph gw[Финал-консюмер шлюза]
+        G --> W{запись в Postgres}
+        W -- ок --> ACK[ack после коммита]
+        W -- БД упала --> HOLD[конверт НЕ отпускается:<br/>повтор записи с паузой, unacked]
+        HOLD --> W
+    end
