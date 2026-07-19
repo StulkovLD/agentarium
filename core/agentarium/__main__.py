@@ -86,8 +86,14 @@ async def _run() -> None:
 
     bus = Bus(os.environ.get("RABBITMQ_URL", DEFAULT_AMQP))
     await bus.connect()
+    # HTTP /health на 8000 — тот порт, что бьёт сгенерированный healthcheck (gen_compose, spec/40).
+    health_port = int(os.environ.get("AGENT_HEALTH_PORT", "8000"))
     agent = agent_cls(
-        instance=instance, bus=bus, queue=queue_name(instance), config=inst.config
+        instance=instance,
+        bus=bus,
+        queue=queue_name(instance),
+        config=inst.config,
+        health_port=health_port,
     )
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

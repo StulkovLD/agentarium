@@ -31,7 +31,9 @@ def test_services_cover_agents_and_gateway():
 def test_agent_service_shape():
     _, services = _services()
     echo = services["echo"]
-    assert echo["build"] == "agents/echo"
+    # build-контекст агента — корень репо, Dockerfile в папке типа: образу нужны core/agentarium и
+    # бандл contract-модулей всех типов (spec/30/40), из папки agents/echo не достать (как у шлюза).
+    assert echo["build"] == {"context": ".", "dockerfile": "agents/echo/Dockerfile"}
     assert echo["init"] is True
     assert echo["restart"] == "unless-stopped"
     assert echo["env_file"] == [".env"]
@@ -40,9 +42,10 @@ def test_agent_service_shape():
     # чертёж смонтирован read-only, источник начинается с ./ (иначе compose примет за named volume)
     assert echo["volumes"] == [f"./{CONFIG}:{MOUNT_TARGET}:ro"]
     assert str(HEALTH_PORT) in " ".join(echo["healthcheck"]["test"])
+    assert "ports" not in echo  # агенты порт наружу не публикуют — только шлюз (вход системы)
 
 
-def test_gateway_service_builds_from_repo_root():
+def test_gateway_service_builds_from_repo_root_and_publishes_port():
     _, services = _services()
     gw = services["gateway"]
     assert "AGENT_INSTANCE" not in gw["environment"]  # у шлюза нет имени экземпляра
@@ -53,6 +56,8 @@ def test_gateway_service_builds_from_repo_root():
     assert "labels" not in gw
     assert gw["volumes"] == [f"./{CONFIG}:{MOUNT_TARGET}:ro"]  # чертёж смонтирован read-only
     assert str(HEALTH_PORT) in " ".join(gw["healthcheck"]["test"])
+    # порт шлюза опубликован наружу: демо и Swagger UI подают заявки с хоста (spec/05, spec/40)
+    assert gw["ports"] == [f"{HEALTH_PORT}:{HEALTH_PORT}"]
 
 
 def test_header_documents_explicit_merge():

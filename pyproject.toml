@@ -21,6 +21,10 @@ dependencies = [
 smoke = [
     "langchain-gigachat>=0.5.1",
 ]
+brains = [
+    "langchain-gigachat>=0.5.1",
+    "langgraph>=0.2.0",
+]
 
 [dependency-groups]
 dev = [

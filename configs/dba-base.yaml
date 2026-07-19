@@ -1,0 +1,37 @@
+# configs/dba-base.yaml — конфигурация A (spec/40, spec/55): parser → knowledge → executor → gateway.
+# Чертёж — единственный источник состава системы. Предметка (DBA) живёт здесь и в агентах каталога,
+# не в ядре. Финал: plan.ready: complete.
+system: dba-requests
+
+entry: request.new              # тип, который шлюз публикует на POST /requests
+
+agents:                         # реестр экземпляров: имя → тип из каталога + конфиг по схеме типа
+  parser:
+    type: parser
+    model: { provider: gigachat, name: GigaChat-2 }
+  knowledge:
+    type: rag
+    collection: regulations
+    model: { provider: gigachat, name: GigaChat-2 }
+  executor:
+    type: executor
+    target_db: env:TARGET_DB_DSN
+    model: { provider: gigachat, name: GigaChat-2-Max }
+
+collections:                    # общие коллекции знаний: владелец паспорта эмбеддингов (spec/45)
+  regulations:
+    source: knowledge/regulations
+    embeddings: { provider: gigachat, model: Embeddings }
+
+routes:                         # маршруты: тип конверта → очереди экземпляров
+  request.new:      [parser]
+  request.parsed:   [knowledge]
+  knowledge.found:  [executor]
+  plan.ready:       [gateway]
+  request.rejected: [gateway]
+  task.failed:      [gateway]
+
+finals:                         # финалы: как шлюзу завершать заявку — предметка не в ядре, а в чертеже
+  plan.ready:       complete
+  request.rejected: fail
+  task.failed:      fail

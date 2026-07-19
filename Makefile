@@ -2,6 +2,17 @@
 CONFIG ?= dba-base
 COLLECTION ?= all
 
+# .env — канал секретов и адресов. Загружаем в окружение хоста для команд, что бегут НЕ в контейнере
+# (gen читает env:TARGET_DB_DSN; seed — GIGACHAT_*). Инфра-адреса для хост-команд принудительно на
+# localhost: в .env стоят compose-хосты (rabbitmq/qdrant), они верны для контейнеров, не для хоста.
+-include .env
+export
+
+COMPOSE := docker compose -f docker-compose.yml -f docker-compose.agents.yml
+INFRA := rabbitmq postgres qdrant jaeger target-db
+LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
+LOCAL_QDRANT := http://localhost:6333
+
 .PHONY: test test-integration test-e2e lint gen apply up demo seed
 
 test:
@@ -10,23 +21,36 @@ test:
 test-integration:
 	uv run pytest -m integration -q
 
+# e2e-live: три заявки spec/55 поверх ПОДНЯТОЙ системы на живом GigaChat (локально, не в CI).
+test-e2e:
+	AGENTARIUM_E2E=1 uv run pytest -m e2e -q
+
 lint:
-	uv run ruff check core tools tests agents
+	uv run ruff check core tools tests agents demo
 
 # gen — валидация рубежа 1 + генерация docker-compose.agents.yml. Только файлы: с брокером не говорит.
 gen:
 	uv run python -m agentarium gen configs/$(CONFIG).yaml
 
-# apply — привести живой брокер к чертежу (topology apply, spec/40). Вызывается отдельно от gen;
-# в порядке make up (S7) стоит после инфраструктуры up+wait — раньше объявлять AMQP-объекты некому.
+# apply — привести живой брокер к чертежу (topology apply, spec/40). Хост → localhost-порт брокера.
 apply:
-	uv run python -m agentarium apply configs/$(CONFIG).yaml
+	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
 
-# seed — проиндексировать базу знаний в Qdrant (spec/45). COLLECTION=all по умолчанию.
-# Читает секцию collections чертежа CONFIG. В make up (S7) встроен ПОСЛЕ инфраструктуры, до агентов.
+# seed — проиндексировать базу знаний в Qdrant (spec/45). brains = живой GigaChat-эмбеддер; Qdrant на
+# localhost-порту. COLLECTION=all по умолчанию. В make up встроен ПОСЛЕ инфраструктуры, до агентов.
 seed:
-	uv run python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
+	QDRANT_URL=$(LOCAL_QDRANT) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
 
-# Цели ниже наполняются слайсами S6–S7 (spec/70). До того — честный отказ, не заглушка-обманка.
-up demo test-e2e:
-	@echo "цель '$@' появится в своём слайсе roadmap (spec/70) — сейчас фаза: см. PROGRAM_STATUS.yaml" && exit 1
+# up — вся система одной командой, строгий порядок из CLAUDE.md:
+#   gen (файлы) → инфраструктура up+wait → topology apply → seed → агенты и шлюз up.
+# Знания раньше агентов (иначе паспорт-сверка уронит rag); шлюз после apply (иначе его очереди ещё нет).
+up: gen
+	$(COMPOSE) up -d --wait $(INFRA)
+	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
+	QDRANT_URL=$(LOCAL_QDRANT) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
+	$(COMPOSE) up -d --build --wait
+
+# demo — полный цикл: up конфигурации + прогон трёх демо-заявок spec/55 (заявка → путь → ответ).
+# Требует живой ключ GigaChat. Смена CONFIG пересобирает систему, включая шлюз.
+demo: up
+	uv run python demo/run_demo.py

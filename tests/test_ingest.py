@@ -5,10 +5,16 @@
 """
 
 import pytest
-from agentarium.storage import embedder
 
 from tests.doubles import HashEmbedder
-from tools.ingest import OVERLAP_TOKENS, WINDOW_TOKENS, Chunk, chunk_markdown
+from tools.ingest import (
+    OVERLAP_TOKENS,
+    WINDOW_TOKENS,
+    Chunk,
+    GigaChatEmbedder,
+    chunk_markdown,
+    embedder,
+)
 
 # --- чанкинг: границы — заголовки --------------------------------------------------------
 
@@ -84,14 +90,16 @@ def test_double_shared_tokens_are_closer():
     assert _cos(base, near) > _cos(base, far)
 
 
-# --- фабрика эмбеддера: дубль в прод-путь не попадает -------------------------------------
+# --- прод-фабрика эмбеддера: gigachat реализован, дубль в прод-путь не попадает ------------
 
 
-def test_gigachat_embedder_is_deferred_to_s7():
-    with pytest.raises(NotImplementedError, match="S7"):
-        embedder("gigachat", "Embeddings")
+def test_gigachat_embedder_factory_builds_giga_embedder():
+    """Прод-фабрика провайдера gigachat даёт GigaChatEmbedder; клиент langchain строится лениво в
+    embed() — сама фабрика ключа и extra `brains` не требует (потому тест зелёный в CI)."""
+    emb = embedder("gigachat", "Embeddings")
+    assert isinstance(emb, GigaChatEmbedder)
 
 
 def test_unknown_provider_is_rejected():
-    with pytest.raises(ValueError, match="stub"):
+    with pytest.raises(ValueError, match="gigachat"):
         embedder("stub", "hash-256")

@@ -16,6 +16,6 @@ def test_catalog_matches_agent_manifests():
         assert agent_cls.produces == entry.produces, f"{type_name}: produces расходится с кодом"
 
 
-def test_catalog_has_exactly_echo_and_reverse():
-    # dba-типы приходят в S7/S8 — в базовой поставке их ещё нет (spec/70)
-    assert set(CATALOG) == {"echo", "reverse"}
+def test_catalog_has_echo_reverse_and_dba_types():
+    # echo/reverse (S3) + dba-типы parser/rag/executor (S7). auditor приходит в S8 (spec/70).
+    assert set(CATALOG) == {"echo", "reverse", "parser", "rag", "executor"}

@@ -1,7 +1,6 @@
 # agents/catalog.yaml — владелец знания «какие типы существуют и каковы их контракты» (spec/40).
 # Ядро не импортирует код агентов (они в других образах) — каталог их машиночитаемое лицо.
-# Пока только тривиальные echo и reverse: на них доказуемо «новый тип без правки ядра».
-# dba-типы (parser/rag/executor) приходят в S7, auditor — в S8 (spec/70). Здесь их ещё нет.
+# Тривиальные echo/reverse (S3) + dba-типы parser/rag/executor (S7). auditor — в S8 (spec/70), здесь его ещё нет.
 
 echo:
   build: agents/echo
@@ -14,3 +13,21 @@ reverse:
   consumes: [echo.done]
   produces: [reverse.done]
   config_schema: {}
+
+parser:
+  build: agents/parser
+  consumes: [request.new]
+  produces: [request.parsed, request.rejected]
+  config_schema: { model: llm }
+
+rag:
+  build: agents/rag
+  consumes: [request.parsed]
+  produces: [knowledge.found]
+  config_schema: { model: llm, collection: str }
+
+executor:
+  build: agents/executor
+  consumes: [knowledge.found]
+  produces: [plan.ready]
+  config_schema: { model: llm, target_db: dsn }

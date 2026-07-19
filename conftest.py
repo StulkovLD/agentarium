@@ -12,3 +12,14 @@ _ROOT = Path(__file__).parent.resolve()
 for _path in (_ROOT, _ROOT / "core"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
+
+
+def pytest_configure(config):
+    """Маркер e2e — живой прогон на GigaChat поверх поднятой системы (локально, `make test-e2e`).
+
+    Регистрируем здесь, а не в pyproject: e2e тесты сами пропускаются, когда система не поднята,
+    поэтому `make test` (`-m "not integration"`) их собирает, но зелёно скипает — CI не краснеет.
+    """
+    config.addinivalue_line(
+        "markers", "e2e: живой прогон на GigaChat поверх поднятой системы (не в CI)"
+    )

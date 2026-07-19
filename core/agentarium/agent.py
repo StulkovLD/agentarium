@@ -16,6 +16,7 @@ from opentelemetry.trace import SpanKind
 from agentarium import contracts, observability
 from agentarium.bus import Bus
 from agentarium.envelope import Envelope, Reply
+from agentarium.health import HealthServer
 
 WATCHDOG_DEFAULT_S = 120.0
 RETRY_DELAYS_S = (1.0, 3.0, 9.0)
@@ -36,6 +37,7 @@ class Agent:
         config: dict | None = None,
         watchdog_s: float = WATCHDOG_DEFAULT_S,
         retry_delays_s: tuple[float, ...] = RETRY_DELAYS_S,
+        health_port: int | None = None,
     ):
         if not self.consumes or not self.produces:
             raise contracts.ContractError(
@@ -50,6 +52,11 @@ class Agent:
         self._stopping = asyncio.Event()
         self._current: asyncio.Task | None = None
         self._log = observability.get_logger(instance)  # ключ agent привязан ко всем строкам
+        # HTTP /health поднимается в run(), если задан порт: launcher его задаёт (spec/40 п.4),
+        # программные тесты — нет (иначе два агента в одном процессе дрались бы за порт 8000).
+        self._health = (
+            HealthServer(self.health, port=health_port) if health_port is not None else None
+        )
 
     async def handle(self, envelope: Envelope) -> Reply | None:  # мозги — дело наследника
         raise NotImplementedError
@@ -59,6 +66,8 @@ class Agent:
     async def run(self) -> None:
         """Петля потребления. Очередь уже объявлена владельцем (topology apply) — passive."""
         observability.configure(self.instance)  # логи + трейсы бесплатно любому агенту (spec/50)
+        if self._health is not None:
+            await self._health.start()  # healthcheck образа становится правдой (spec/30, spec/40)
         queue = await self._bus.channel.get_queue(self._queue_name, ensure=False)
         consumer_tag = await queue.consume(self._on_message, no_ack=False)
         self._log.info("consuming", queue=self._queue_name)
@@ -66,6 +75,8 @@ class Agent:
         await queue.cancel(consumer_tag)
         if self._current is not None:
             await asyncio.shield(self._current)  # изящное завершение: начатое доводится
+        if self._health is not None:
+            await self._health.stop()
 
     def stop(self) -> None:
         self._stopping.set()
