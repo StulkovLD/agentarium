@@ -17,5 +17,5 @@ def test_catalog_matches_agent_manifests():
 
 
 def test_catalog_has_echo_reverse_and_dba_types():
-    # echo/reverse (S3) + dba-типы parser/rag/executor (S7). auditor приходит в S8 (spec/70).
-    assert set(CATALOG) == {"echo", "reverse", "parser", "rag", "executor"}
+    # echo/reverse (S3) + dba-типы parser/rag/executor (S7) + auditor (S8, конфигурация B).
+    assert set(CATALOG) == {"echo", "reverse", "parser", "rag", "executor", "auditor"}

@@ -40,12 +40,17 @@ def _render(text: str, body: dict) -> None:
     result = body.get("result") or {}
     if status == "done":
         req = result.get("request", {})
-        print(f"  путь:    parser → knowledge → executor   (интент: {req.get('intent')})")
+        audit = result.get("audit")  # конфигурация B добавляет блок audit (spec/55)
+        path = "parser → knowledge → executor" + (" → auditor" if audit is not None else "")
+        print(f"  путь:    {path}   (интент: {req.get('intent')})")
         print(f"  план:    {result.get('plan')}")
         for check in result.get("checks", []):
             print(f"  проверка {check['name']}({check['args']}) → {check['result']}")
         print(f"  источники: {result.get('sources')}")
         print(f"  ВЕРДИКТ:  {result.get('verdict')}")
+        if audit is not None:  # обогащённый финал: замечания «на этих граблях уже стояли»
+            warnings = audit.get("warnings") or []
+            print(f"  АУДИТ:    {'; '.join(warnings) if warnings else 'план граблей не повторяет'}")
     elif status == "failed":
         reason = result.get("reason", result)
         print("  путь:    parser → gateway   (отказ — не заявка / ошибка)")

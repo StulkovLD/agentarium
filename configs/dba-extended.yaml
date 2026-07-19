@@ -1,0 +1,46 @@
+# configs/dba-extended.yaml — конфигурация B (spec/40, spec/55): те же кубики + аудит плана.
+# parser → knowledge → executor → auditor → gateway. Финал: audit.done: complete (план больше не
+# завершает заявку — завершает аудит). Ядро и существующие агенты не тронуты: diff с dba-base трогает
+# только этот YAML и папку agents/auditor — дословно требование №3 (spec/55).
+system: dba-requests
+
+entry: request.new              # тип, который шлюз публикует на POST /requests
+
+agents:                         # реестр экземпляров: имя → тип из каталога + конфиг по схеме типа
+  parser:
+    type: parser
+    model: { provider: gigachat, name: GigaChat-2 }
+  knowledge:
+    type: rag
+    collection: regulations
+    model: { provider: gigachat, name: GigaChat-2 }
+  executor:
+    type: executor
+    target_db: env:TARGET_DB_DSN
+    model: { provider: gigachat, name: GigaChat-2-Max }
+  auditor:                      # новый тип из каталога (S8): план → сверка с историей инцидентов
+    type: auditor
+    collection: incidents
+    model: { provider: gigachat, name: GigaChat-2 }
+
+collections:                    # общие коллекции знаний: владелец паспорта эмбеддингов (spec/45)
+  regulations:
+    source: knowledge/regulations
+    embeddings: { provider: gigachat, model: Embeddings }
+  incidents:                    # истории инцидентов для аудита плана (конфигурация B, spec/55)
+    source: knowledge/incidents
+    embeddings: { provider: gigachat, model: Embeddings }
+
+routes:                         # маршруты переключены на аудит: план уходит аудитору, финал — аудит
+  request.new:      [parser]
+  request.parsed:   [knowledge]
+  knowledge.found:  [executor]
+  plan.ready:       [auditor]
+  audit.done:       [gateway]
+  request.rejected: [gateway]
+  task.failed:      [gateway]
+
+finals:                         # финал теперь audit.done; plan.ready финалом быть перестал (spec/55)
+  audit.done:       complete
+  request.rejected: fail
+  task.failed:      fail

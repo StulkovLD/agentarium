@@ -22,7 +22,7 @@ slices:
   S5-storage: done   # 54 unit + 21 integration; паспорт id=0, инжест идемпотентен; хост-порт pg → 5433
   S6-gateway: done   # шлюз универсален, образ собран, 62 unit + 27 integration; e2e echo-цепочка зелёная
   S7-poc-demo-resilience: code_done_live_pending  # 88u+35i зелёные; демо/чаос/e2e ждут ключ GigaChat — внешний блок; S8-код разрешён тимлидом
-  S8-extended-config: pending
+  S8-extended-config: code_done_live_pending  # auditor + dba-extended: 102u+36i зелёные; живой прогон ждёт ключ
   S9-polish-release: pending
 
 authorized:

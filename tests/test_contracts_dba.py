@@ -10,6 +10,7 @@ from agentarium import contracts
 from gateway.consumers import extract_text
 
 # Импорт contract-модулей регистрирует их схемы в реестре (side effect, spec/30).
+from agents.auditor.contract import AuditDonePayload  # noqa: F401
 from agents.executor.contract import Check, PlanReadyPayload  # noqa: F401
 from agents.parser.contract import INTENTS, Entities, ParsedRequest  # noqa: F401
 from agents.rag.contract import KnowledgeFoundPayload  # noqa: F401
@@ -107,3 +108,35 @@ def test_finals_carry_text_for_gateway():
 def test_check_model_is_typed():
     check = Check(name="pg_version", args={}, result="PostgreSQL 16.1")
     assert check.name == "pg_version"
+
+
+# --- audit.done: финал конфигурации B, те же поля plan.ready + audit, несёт request.text ----------
+
+
+def _audit_done():
+    # audit.done = plan.ready нетронутый + блок audit (труба, spec/55): auditor лишь добавляет его.
+    return {**_plan_ready(), "audit": {"warnings": ["архивирование WAL стоит проверить до окна"]}}
+
+
+def test_audit_done_accepts_valid():
+    contracts.validate_payload("audit.done", _audit_done())
+
+
+def test_audit_done_accepts_empty_warnings():
+    # Пусто — план граблей не повторяет (spec/55), это валидный обогащённый финал.
+    contracts.validate_payload("audit.done", {**_plan_ready(), "audit": {"warnings": []}})
+
+
+def test_audit_done_rejects_missing_audit():
+    with pytest.raises(contracts.ContractError):
+        contracts.validate_payload("audit.done", _plan_ready())  # нет блока audit
+
+
+def test_audit_done_rejects_audit_without_warnings():
+    with pytest.raises(contracts.ContractError):
+        contracts.validate_payload("audit.done", {**_plan_ready(), "audit": {}})
+
+
+def test_audit_done_carries_text_to_gateway():
+    # Труба до самого конца: финал B несёт request.text шлюзу и его recovery-UPSERT (spec/40).
+    assert extract_text(_audit_done()) == _PARSED["text"]
