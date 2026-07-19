@@ -12,7 +12,7 @@ flowchart LR
         JG[Jaeger<br/>трейсы]
     end
 
-    subgraph agents[Агенты PoC — мозги: LangGraph + GigaChat]
+    subgraph agents[Агенты PoC — мозги: langchain-gigachat, LangGraph в executor]
         P[parser]
         K[knowledge · rag]
         E[executor]

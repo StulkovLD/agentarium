@@ -27,21 +27,22 @@ collections:
     embeddings: { provider: gigachat, model: Embeddings }
 
 routes:
-  request.new:     [intake]
-  request.parsed:  [brain]
-  knowledge.found: [gateway]
-  task.failed:     [gateway]
+  request.new:      [intake]
+  request.parsed:   [brain]
+  knowledge.found:  [gateway]
+  request.rejected: [gateway]      # intake умеет отказать — отказу тоже нужен маршрут
+  task.failed:      [gateway]
 
 finals:                            # как шлюзу завершать заявку
-  knowledge.found: complete
-  task.failed:     fail
+  knowledge.found:  complete
+  request.rejected: fail
+  task.failed:      fail
 ```
 
 Запусти:
 
 ```bash
-make gen CONFIG=my-system   # чертёж → docker-compose.agents.yml
-make up                     # вся система одной командой
+make up CONFIG=my-system    # одной командой: валидация чертежа → инфраструктура → seed → агенты
 ```
 
 Правила чертежа, все поля и валидации: `../spec/40-topology.md`.
@@ -89,7 +90,15 @@ class TranslatorAgent(Agent):
 
 ## 5. Частые вопросы
 
-- **Хочу два RAG с разными знаниями.** Два экземпляра одного типа с разными `collection` — см. `configs/dba-extended.yaml`, это ровно оно.
+- **Хочу два RAG с разными знаниями.** Два экземпляра одного типа с разными `collection` — тип это класс, экземпляр это объект:
+
+  ```yaml
+  agents:
+    docs-brain:      { type: rag, collection: handbook,  model: { provider: gigachat, name: GigaChat-2 } }
+    incidents-brain: { type: rag, collection: incidents, model: { provider: gigachat, name: GigaChat-2 } }
+  ```
+
+  Код один, узла два, знания разные.
 - **Хочу свою модель / свой сервер с GPU.** `model: { provider: openai_compatible, base_url: http://my-gpu:11434/v1, name: qwen2.5 }` — платформа не заметит разницы: конфиг модели она передаёт агенту как данные. Сам адаптер провайдера — часть мозгов агента: у типовых агентов PoC реализован GigaChat, другой провайдер — плюс маленький адаптер в коде типа.
 - **Агент падает.** Это штатно: конверт ждёт в очереди, docker перезапустит, ретраи в SDK. Смотри `task.failed` в трейсе и `agentarium.dlq` в RabbitMQ UI.
-- **Хочу ветвление маршрутов.** Несколько получателей на тип (`fan-out`) — просто перечисли: `plan.ready: [gateway, auditor]`.
+- **Хочу ветвление маршрутов.** Несколько получателей на тип (`fan-out`) — просто перечисли: `request.parsed: [brain, stats-collector]`. Один нюанс: достижимый `complete`-финал в конфигурации должен остаться ровно один — валидация чертежа за этим следит.
