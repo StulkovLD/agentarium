@@ -10,6 +10,8 @@
 # configs/my-system.yaml
 system: my-system
 
+entry: request.new                 # что публикует шлюз на POST /requests
+
 agents:
   intake:
     type: parser
@@ -19,11 +21,20 @@ agents:
     collection: my-docs
     model: { provider: gigachat, name: GigaChat-2 }
 
+collections:
+  my-docs:
+    source: knowledge/my-docs
+    embeddings: { provider: gigachat, model: Embeddings }
+
 routes:
   request.new:     [intake]
   request.parsed:  [brain]
   knowledge.found: [gateway]
   task.failed:     [gateway]
+
+finals:                            # как шлюзу завершать заявку
+  knowledge.found: complete
+  task.failed:     fail
 ```
 
 Запусти:
@@ -79,6 +90,6 @@ class TranslatorAgent(Agent):
 ## 5. Частые вопросы
 
 - **Хочу два RAG с разными знаниями.** Два экземпляра одного типа с разными `collection` — см. `configs/dba-extended.yaml`, это ровно оно.
-- **Хочу свою модель / свой сервер с GPU.** `model: { provider: openai_compatible, base_url: http://my-gpu:11434/v1, name: qwen2.5 }` — платформа не заметит разницы.
+- **Хочу свою модель / свой сервер с GPU.** `model: { provider: openai_compatible, base_url: http://my-gpu:11434/v1, name: qwen2.5 }` — платформа не заметит разницы: конфиг модели она передаёт агенту как данные. Сам адаптер провайдера — часть мозгов агента: у типовых агентов PoC реализован GigaChat, другой провайдер — плюс маленький адаптер в коде типа.
 - **Агент падает.** Это штатно: конверт ждёт в очереди, docker перезапустит, ретраи в SDK. Смотри `task.failed` в трейсе и `agentarium.dlq` в RabbitMQ UI.
 - **Хочу ветвление маршрутов.** Несколько получателей на тип (`fan-out`) — просто перечисли: `plan.ready: [gateway, auditor]`.

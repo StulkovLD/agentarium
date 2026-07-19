@@ -5,7 +5,7 @@ phase: paper_in_review # бумага написана, ждёт ревью по
 
 gates:
   G0-paper-accepted:
-    status: open       # закрывается ревью Лукьяна; при закрытии: seal = коммит принятия, version -> 0.1.0
+    status: open       # закрывается ревью G0 (тройное кросс-модельное ревью пройдено, правки вращены; ждёт слова владельца); при закрытии: seal = коммит принятия, version -> 0.1.0
     seal: null
   G1-core-built:       # слайсы S1-S6 закрыты
     status: pending
