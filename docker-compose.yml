@@ -79,7 +79,31 @@ services:
       # durable-стор коллекций: перезапуск Qdrant не требует переиндексации знаний (spec/45)
       - qdrant-data:/qdrant/storage
 
+  target-db:
+    image: postgres:16.10   # PoC-«пациент», которого сопровождает система (spec/55); пин патча как у складов (spec/05)
+    container_name: agentarium-target-db
+    environment:
+      POSTGRES_USER: postgres         # суперюзер-обслуживание пациента; исполнитель ходит под readonly_executor
+      POSTGRES_PASSWORD: pacient
+      POSTGRES_DB: billing            # база-пациент; init-скрипты наполняют её ролями и данными
+    ports:
+      - "5434:5432"   # наружу 5434: не конфликтуем ни с хост-postgres (5432), ни со складом состояния (5433)
+    volumes:
+      # init-скрипты выполняются один раз на пустом томе: роли, схема billing, данные, гранты (spec/55)
+      - ./infra/target-db/init:/docker-entrypoint-initdb.d:ro
+      # durable-том пациента; для повторной инициализации с нуля — docker compose down -v target-db
+      - target-db-data:/var/lib/postgresql/data
+    healthcheck:
+      # healthy только после отработки init-скриптов (TCP поднимается последним) — под это ждёт --wait
+      test: ["CMD-SHELL", "pg_isready -U postgres -d billing"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   rabbitmq-data:
   postgres-data:
   qdrant-data:
+  target-db-data:
