@@ -15,7 +15,7 @@ gates:
     status: pending
 
 slices:
-  S1-skeleton-envelope: pending
+  S1-skeleton-envelope: done   # 10 контрактных тестов, ruff чист, схема экспортирована
   S2-bus-sdk: pending
   S3-topology: pending
   S4-observability: pending
