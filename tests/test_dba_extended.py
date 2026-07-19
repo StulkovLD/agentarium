@@ -40,4 +40,5 @@ def test_dba_extended_declares_incidents_collection():
     topo = load_topology("configs/dba-extended.yaml", CATALOG, environ=ENV)
     incidents = topo.collections["incidents"]
     assert incidents.source == "knowledge/incidents"
-    assert incidents.embeddings.provider == "gigachat"  # gigachat-эмбеддинги (spec/55)
+    assert incidents.embeddings.provider == "ollama"  # bge-m3/Ollama-эмбеддинги (spec/05, spec/55)
+    assert incidents.embeddings.model == "bge-m3"

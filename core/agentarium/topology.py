@@ -60,6 +60,9 @@ class Embeddings(BaseModel):
 
     provider: str
     model: str
+    # Адрес HTTP-эмбеддера (провайдер ollama): compose-хост в чертеже, с хоста бьётся env
+    # OLLAMA_BASE_URL (spec/45). Провайдеры без него (gigachat, stub) оставляют поле пустым.
+    base_url: str | None = None
 
 
 class Collection(BaseModel):

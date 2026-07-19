@@ -2,8 +2,8 @@
 
 Предметки не знает: раскладку knowledge/<коллекция>/ владеет чертёж (секция collections, spec/40).
 Идемпотентен: коллекция пересоздаётся целиком, повторный прогон не плодит дублей.
-Прод-фабрика эмбеддера — здесь (langchain-gigachat — extra `brains`, в ядро не тянется, spec/00);
-тесты подают детерминированный дубль своей фабрикой, так дубль не пробивается в прод-путь (spec/70).
+Прод-фабрика эмбеддера по провайдеру — agents/embedders.make_embedder (ollama httpx в ядре, gigachat
+langchain лениво вне ядра, spec/00); тесты подают детерминированный дубль своей фабрикой (spec/70).
 """
 
 import os
@@ -18,62 +18,18 @@ from agentarium.topology import Collection, load_catalog, load_topology
 from pydantic import BaseModel, ConfigDict
 from qdrant_client import QdrantClient, models
 
+from agents.embedders import make_embedder
+
 CATALOG_PATH = "agents/catalog.yaml"
 DEFAULT_QDRANT_URL = "http://localhost:6333"
 
 WINDOW_TOKENS = 500  # секция крупнее ~500 токенов доразбивается окном (spec/45)
 OVERLAP_TOKENS = 50  # перехлёст соседних окон — чтобы граница окна не рвала мысль пополам
 
-EmbedderFactory = Callable[[str, str], Embedder]
+# Фабрика: (provider, model, base_url) → эмбеддер. base_url нужен ollama (compose-хост из чертежа).
+EmbedderFactory = Callable[[str, str, str | None], Embedder]
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-
-
-# --- прод-фабрика эмбеддера: gigachat поверх langchain (extra `brains`) --------------------
-
-
-class GigaChatEmbedder:
-    """Реализует протокол storage.Embedder поверх langchain-gigachat. langchain — лениво в embed():
-    импорт tools.ingest и сборка фабрики не требуют extra `brains` (юниты без ключа и мозгов).
-    """
-
-    def __init__(self, model: str):
-        self._model = model
-        self._client = None
-
-    def _embeddings(self):
-        if self._client is None:
-            from langchain_gigachat import GigaChatEmbeddings
-
-            common = {
-                "credentials": os.environ["GIGACHAT_CREDENTIALS"],
-                "scope": os.environ.get("GIGACHAT_SCOPE", "GIGACHAT_API_PERS"),
-                "model": self._model,
-            }
-            base_url = os.environ.get("GIGACHAT_BASE_URL")
-            if base_url:
-                common["base_url"] = base_url
-            ca_bundle = os.environ.get("GIGACHAT_CA_BUNDLE_FILE")
-            if ca_bundle:
-                common["ca_bundle_file"] = ca_bundle
-            self._client = GigaChatEmbeddings(**common)
-        return self._client
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        return self._embeddings().embed_documents(texts)
-
-
-def embedder(provider: str, model: str) -> Embedder:
-    """Прод-фабрика эмбеддера по провайдеру из чертежа. Знает только gigachat; иное — громкий отказ.
-
-    Тесты подают свою фабрику с детерминированным дублём — так дубль не пробивается в прод-путь.
-    """
-    if provider == "gigachat":
-        return GigaChatEmbedder(model)
-    raise ValueError(
-        f"неизвестный провайдер эмбеддера '{provider}' (модель '{model}') — прод индексирует "
-        f"только gigachat; для тестов подай свою embedder_factory с дублём"
-    )
 
 
 # --- чанкинг: границы — заголовки, крупные секции — окном ---------------------------------
@@ -204,7 +160,7 @@ def ingest(
     *,
     client: QdrantClient,
     collection: str | None = None,
-    embedder_factory: EmbedderFactory = embedder,
+    embedder_factory: EmbedderFactory = make_embedder,
     catalog_path: str = CATALOG_PATH,
     out: Callable[[str], None] = print,
 ) -> dict[str, int]:
@@ -227,15 +183,15 @@ def ingest(
 
     counts: dict[str, int] = {}
     for name, block in targets.items():
-        emb = embedder_factory(block.embeddings.provider, block.embeddings.model)
+        emb = embedder_factory(
+            block.embeddings.provider, block.embeddings.model, block.embeddings.base_url
+        )
         counts[name] = ingest_collection(client, emb, name=name, collection=block)
         out(f"коллекция {name}: {counts[name]} чанков проиндексировано из {block.source}")
     return counts
 
 
 def _cli() -> None:
-    import os
-
     args = sys.argv[1:]
     if not args:
         raise SystemExit("использование: python -m tools.ingest CONFIG.yaml [COLLECTION|all]")

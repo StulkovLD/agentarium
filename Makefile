@@ -9,9 +9,12 @@ COLLECTION ?= all
 export
 
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.agents.yml
-INFRA := rabbitmq postgres qdrant jaeger target-db
+# ollama в INFRA: его healthcheck зелен лишь когда bge-m3 подгружена (serve+pull встроены в старт
+# сервиса, docker-compose.yml), поэтому `up --wait $(INFRA)` прогревает модель ДО seed (spec/45).
+INFRA := rabbitmq postgres qdrant jaeger ollama target-db
 LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
+LOCAL_OLLAMA := http://localhost:11434
 
 .PHONY: test test-integration test-e2e lint gen apply up demo seed
 
@@ -36,10 +39,11 @@ gen:
 apply:
 	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
 
-# seed — проиндексировать базу знаний в Qdrant (spec/45). brains = живой GigaChat-эмбеддер; Qdrant на
-# localhost-порту. COLLECTION=all по умолчанию. В make up встроен ПОСЛЕ инфраструктуры, до агентов.
+# seed — проиндексировать базу знаний в Qdrant (spec/45). Эмбеддер — из чертежа (PoC: bge-m3/Ollama).
+# Хост-адреса: Qdrant и Ollama на localhost-портах (в чертеже стоят compose-хосты, для контейнеров).
+# COLLECTION=all по умолчанию. В make up встроен ПОСЛЕ инфраструктуры (модель уже прогрета), до агентов.
 seed:
-	QDRANT_URL=$(LOCAL_QDRANT) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
+	QDRANT_URL=$(LOCAL_QDRANT) OLLAMA_BASE_URL=$(LOCAL_OLLAMA) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
 
 # up — вся система одной командой, строгий порядок из CLAUDE.md:
 #   gen (файлы) → инфраструктура up+wait → topology apply → seed → агенты и шлюз up.
@@ -47,7 +51,7 @@ seed:
 up: gen
 	$(COMPOSE) up -d --wait $(INFRA)
 	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
-	QDRANT_URL=$(LOCAL_QDRANT) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
+	QDRANT_URL=$(LOCAL_QDRANT) OLLAMA_BASE_URL=$(LOCAL_OLLAMA) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
 	$(COMPOSE) up -d --build --wait
 
 # demo — полный цикл: up конфигурации + прогон трёх демо-заявок spec/55 (заявка → путь → ответ).

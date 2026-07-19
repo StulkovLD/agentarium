@@ -6,14 +6,13 @@
 
 import pytest
 
+from agents.embedders import GigaChatEmbedder, make_embedder
 from tests.doubles import HashEmbedder
 from tools.ingest import (
     OVERLAP_TOKENS,
     WINDOW_TOKENS,
     Chunk,
-    GigaChatEmbedder,
     chunk_markdown,
-    embedder,
 )
 
 # --- чанкинг: границы — заголовки --------------------------------------------------------
@@ -96,10 +95,10 @@ def test_double_shared_tokens_are_closer():
 def test_gigachat_embedder_factory_builds_giga_embedder():
     """Прод-фабрика провайдера gigachat даёт GigaChatEmbedder; клиент langchain строится лениво в
     embed() — сама фабрика ключа и extra `brains` не требует (потому тест зелёный в CI)."""
-    emb = embedder("gigachat", "Embeddings")
+    emb = make_embedder("gigachat", "Embeddings")
     assert isinstance(emb, GigaChatEmbedder)
 
 
 def test_unknown_provider_is_rejected():
     with pytest.raises(ValueError, match="gigachat"):
-        embedder("stub", "hash-256")
+        make_embedder("stub", "hash-256")

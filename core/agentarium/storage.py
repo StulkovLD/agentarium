@@ -42,8 +42,9 @@ async def postgres_pool(dsn: str) -> asyncpg.Pool:
 class Embedder(Protocol):
     """Контракт эмбеддера: батч текстов → батч векторов. Размерность узнаётся пробным вызовом.
 
-    Прод-фабрика по провайдеру — в tools/ingest (gigachat поверх langchain — не в ядре, spec/00);
-    для CI и юнитов — детерминированный дубль (tests/), в прод-путь он не попадает.
+    Провайдер ollama реализует ядро чистым httpx (agentarium.embedders); фабрика по провайдеру —
+    agents/embedders.make_embedder (gigachat поверх langchain — не в ядре, spec/00). Для CI и юнитов
+    — детерминированный дубль (tests/), в прод-путь он не попадает.
     """
 
     def embed(self, texts: list[str]) -> list[list[float]]: ...

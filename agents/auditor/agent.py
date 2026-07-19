@@ -1,15 +1,17 @@
 """Тип auditor: план работ → сверка с историей инцидентов. Спека: 55, 45, 30 (конфигурация B).
 
-Мозги — GigaChat Embeddings + GigaChat: план (executor.plan) → вектор (auditor.query, детерминизм)
-→ поиск в коллекции incidents экземпляра (top-5, порог) → LLM-сверка «на этих граблях уже стояли» →
-audit.done с замечаниями. Контекст заявки и итог executor прокладываются дальше нетронутыми (труба,
-spec/55): auditor лишь добавляет блок audit — обогащённый финал конфигурации B.
+Мозги — эмбеддер из чертежа (PoC: bge-m3/Ollama) + GigaChat: план (executor.plan) → вектор
+(auditor.query, детерминизм) → поиск в коллекции incidents экземпляра (top-5, порог) → LLM-сверка
+«на этих граблях уже стояли» → audit.done с замечаниями. Контекст заявки и итог executor
+прокладываются дальше нетронутыми (труба, spec/55): auditor лишь добавляет блок audit — обогащённый
+финал конфигурации B.
 
-Клиент Qdrant и сверка паспорта — в __init__ (fail-fast на старте, sync); эмбеддер и chat-LLM —
-лениво на первом handle (импорт модуля для каталога/тестов не тянет extra `brains`). Устройство —
-как у rag (embeddings + Qdrant), плюс chat-LLM для формулировки замечаний.
+Клиент Qdrant, сверка паспорта и сборка эмбеддера — в __init__ (fail-fast на старте, sync); chat-LLM
+— лениво на первом handle (импорт модуля для каталога/тестов не тянет extra `brains`). Устройство —
+как у rag (эмбеддер + Qdrant), плюс chat-LLM для формулировки замечаний.
 """
 
+import asyncio
 import os
 
 from agentarium import storage
@@ -21,6 +23,7 @@ from qdrant_client import QdrantClient
 
 from agents.auditor import contract  # noqa: F401 — регистрирует схему audit.done (spec/30)
 from agents.auditor.query import build_query
+from agents.embedders import make_embedder
 from agents.executor.contract import PlanReadyPayload
 
 TOP_K = 5  # spec/55
@@ -70,8 +73,9 @@ class AuditorAgent(Agent):
         )
         # storage.qdrant сверяет паспорт коллекции с чертежом — расхождение падает громко на старте.
         self._incidents = storage.qdrant(collection, topo, client=client)
-        self._embeddings_cfg = topo.collections[collection].embeddings
-        self._embeddings = None  # ленивая сборка эмбеддера
+        # Эмбеддер той же модели/провайдера, что индексировали incidents (иначе вектора несравнимы).
+        cfg = topo.collections[collection].embeddings
+        self._embedder = make_embedder(cfg.provider, cfg.model, cfg.base_url)
         self._auditor = None  # ленивая сборка chat-LLM (structured output)
 
     def _common_creds(self) -> dict:
@@ -86,16 +90,6 @@ class AuditorAgent(Agent):
         if ca_bundle:
             common["ca_bundle_file"] = ca_bundle
         return common
-
-    def _embedder(self):
-        """GigaChat Embeddings той же модели, что индексировала incidents (иначе mismatch)."""
-        if self._embeddings is None:
-            from langchain_gigachat import GigaChatEmbeddings
-
-            self._embeddings = GigaChatEmbeddings(
-                model=self._embeddings_cfg.model, **self._common_creds()
-            )
-        return self._embeddings
 
     def _llm(self):
         """Chat-LLM для замечаний. Модель — из config экземпляра (chat, не эмбеддер)."""
@@ -114,7 +108,8 @@ class AuditorAgent(Agent):
 
     async def handle(self, envelope: Envelope) -> Reply | None:
         payload = PlanReadyPayload.model_validate(envelope.payload)  # типизированно, для запроса
-        vector = await self._embedder().aembed_query(build_query(payload.plan))
+        query = build_query(payload.plan)
+        vector = (await asyncio.to_thread(self._embedder.embed, [query]))[0]
         hits = self._incidents.search(vector, limit=TOP_K, score_threshold=SCORE_THRESHOLD)
         result = await self._llm().ainvoke(
             [

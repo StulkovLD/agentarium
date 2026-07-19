@@ -35,7 +35,7 @@ CATALOG = "agents/catalog.yaml"
 COLLECTION = "test-docs"
 
 
-def _double_factory(provider: str, model: str) -> HashEmbedder:
+def _double_factory(provider: str, model: str, base_url: str | None = None) -> HashEmbedder:
     """Тестовая фабрика: детерминированный дубль вместо живого эмбеддера — так дубль вне прода."""
     return HashEmbedder()
 

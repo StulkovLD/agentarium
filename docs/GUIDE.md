@@ -24,7 +24,7 @@ agents:
 collections:
   my-docs:
     source: knowledge/my-docs
-    embeddings: { provider: gigachat, model: Embeddings }
+    embeddings: { provider: ollama, model: bge-m3, base_url: http://ollama:11434 }
 
 routes:
   request.new:      [intake]
