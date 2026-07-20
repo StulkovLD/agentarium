@@ -17,7 +17,7 @@ LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
 LOCAL_OLLAMA := http://localhost:11534
 
-.PHONY: test test-integration test-e2e lint gen apply up demo seed
+.PHONY: test test-integration test-e2e lint gen apply up demo seed down
 
 test:
 	uv run pytest -m "not integration" -q
@@ -40,7 +40,7 @@ gen:
 apply:
 	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
 
-# seed — проиндексировать базу знаний в Qdrant (spec/45). Эмбеддер — из чертежа (PoC: bge-m3/Ollama).
+# seed — проиндексировать базу знаний в Qdrant (spec/45). Эмбеддер — из чертежа (дефолт: GigaChat API).
 # Хост-адреса: Qdrant и Ollama на localhost-портах (в чертеже стоят compose-хосты, для контейнеров).
 # COLLECTION=all по умолчанию. В make up встроен ПОСЛЕ инфраструктуры (модель уже прогрета), до агентов.
 seed:
@@ -61,3 +61,8 @@ up: gen
 # Требует живой ключ GigaChat. Смена CONFIG пересобирает систему, включая шлюз.
 demo: up
 	uv run python demo/run_demo.py
+
+# down — остановить и снести стенд (контейнеры + сеть; тома-склады сохраняются). --profile local
+# снимает и Ollama, если он поднимался офлайн-путём. Тома удаляются только явным down -v.
+down:
+	$(COMPOSE) --profile local down
