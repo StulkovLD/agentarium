@@ -64,5 +64,7 @@ demo: up
 
 # down — остановить и снести стенд (контейнеры + сеть; тома-склады сохраняются). --profile local
 # снимает и Ollama, если он поднимался офлайн-путём. Тома удаляются только явным down -v.
+# docker-compose.agents.yml генерируется на up/gen — на чистом клоне (down без запуска) его ещё нет,
+# поэтому подключаем его только когда файл существует, иначе валимся на отсутствующем -f.
 down:
-	$(COMPOSE) --profile local down
+	docker compose -f docker-compose.yml $(if $(wildcard docker-compose.agents.yml),-f docker-compose.agents.yml,) --profile local down
