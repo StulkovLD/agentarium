@@ -92,6 +92,41 @@ def test_factory_gigachat_is_lazy(monkeypatch):
     assert isinstance(emb, GigaChatEmbedder)
 
 
+def test_gigachat_embedder_builds_client_and_calls_embed(monkeypatch):
+    """Код-путь дефолтного (API) провайдера: фабрика собирает GigaChatEmbeddings с нужными
+    параметрами и зовёт embed_documents. Живой API не трогаем (у freemium эмбеддинги платные) —
+    доказываем, что вызов сформирован верно; ответ API — на стороне проверяющего с полным ключом.
+    """
+    import sys
+    import types
+
+    captured = {}
+
+    class FakeEmbeddings:
+        def __init__(self, **kwargs):
+            captured["init"] = kwargs
+
+        def embed_documents(self, texts):
+            captured["texts"] = texts
+            return [[0.1, 0.2, 0.3] for _ in texts]
+
+    fake_mod = types.ModuleType("langchain_gigachat")
+    fake_mod.GigaChatEmbeddings = FakeEmbeddings
+    monkeypatch.setitem(sys.modules, "langchain_gigachat", fake_mod)
+    monkeypatch.setenv("GIGACHAT_CREDENTIALS", "test-key")
+    monkeypatch.setenv("GIGACHAT_CA_BUNDLE_FILE", "/certs/ca.pem")
+
+    emb = make_embedder("gigachat", "Embeddings", base_url="https://api.giga.chat/v1")
+    vectors = emb.embed(["регламент доступа", "ролевая модель"])
+
+    assert captured["init"]["credentials"] == "test-key"
+    assert captured["init"]["model"] == "Embeddings"
+    assert captured["init"]["base_url"] == "https://api.giga.chat/v1"
+    assert captured["init"]["ca_bundle_file"] == "/certs/ca.pem"
+    assert captured["texts"] == ["регламент доступа", "ролевая модель"]
+    assert len(vectors) == 2 and len(vectors[0]) == 3
+
+
 def test_factory_rejects_unknown_provider():
     with pytest.raises(ValueError, match="ollama или gigachat"):
         make_embedder("stub", "hash-256")

@@ -81,6 +81,7 @@ services:
 
   ollama:
     image: ollama/ollama:0.6.8   # локальный эмбеддер bge-m3 для RAG (spec/05 слой 2); патч запинен — воспроизводимо
+    profiles: [local]            # поднимается только для *-local конфига; дефолт — эмбеддинги GigaChat по API
     container_name: agentarium-ollama
     entrypoint: ["/bin/sh", "-c"]
     # Прогрев модели встроен в старт: serve в фоне → pull bge-m3 → ждём serve. Healthcheck зелен ЛИШЬ

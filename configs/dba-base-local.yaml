@@ -1,0 +1,41 @@
+# configs/dba-base-local.yaml — та же конфигурация A, но эмбеддинги на локальной bge-m3 через Ollama.
+# Зачем: если у ключа GigaChat нет доступа к эмбеддингам (напр. бесплатный тариф — платные эмбеддинги),
+# RAG работает офлайн, без обращения к API за векторами. Одна строка отличия от dba-base — сам факт,
+# что провайдер эмбеддингов переключается чертежом (spec/45), и есть демонстрация конфигурируемости.
+# Запуск: make demo CONFIG=dba-base-local  (поднимет дополнительно Ollama-контейнер, дольше первый прогон).
+system: dba-requests
+
+entry: request.new
+
+agents:
+  parser:
+    type: parser
+    model: { provider: gigachat, name: GigaChat-2 }
+  knowledge:
+    type: rag
+    collection: regulations
+    model: { provider: gigachat, name: GigaChat-2 }
+  executor:
+    type: executor
+    target_db: env:TARGET_DB_DSN
+    model: { provider: gigachat, name: GigaChat-3-Ultra }
+
+collections:
+  regulations:
+    source: knowledge/regulations
+    # bge-m3 через Ollama-сервис (spec/05 слой 2): платформа ходит по HTTP. base_url — compose-хост;
+    # с хоста (seed/тесты) перебивается переменной OLLAMA_BASE_URL (spec/45).
+    embeddings: { provider: ollama, model: bge-m3, base_url: http://ollama:11434 }
+
+routes:
+  request.new:      [parser]
+  request.parsed:   [knowledge]
+  knowledge.found:  [executor]
+  plan.ready:       [gateway]
+  request.rejected: [gateway]
+  task.failed:      [gateway]
+
+finals:
+  plan.ready:       complete
+  request.rejected: fail
+  task.failed:      fail

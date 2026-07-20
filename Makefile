@@ -9,9 +9,10 @@ COLLECTION ?= all
 export
 
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.agents.yml
-# ollama в INFRA: его healthcheck зелен лишь когда bge-m3 подгружена (serve+pull встроены в старт
-# сервиса, docker-compose.yml), поэтому `up --wait $(INFRA)` прогревает модель ДО seed (spec/45).
-INFRA := rabbitmq postgres qdrant jaeger ollama target-db
+# Дефолтный путь — эмбеддинги GigaChat по API, Ollama не нужен (быстрее, легче, для проверяющего).
+# Ollama добавляется в стек ТОЛЬКО для *-local конфига (офлайн-эмбеддинги на bge-m3): его healthcheck
+# зелен лишь когда модель подгружена (serve+pull в старте сервиса), поэтому up --wait прогреет её до seed.
+INFRA := rabbitmq postgres qdrant jaeger target-db $(if $(filter %-local,$(CONFIG)),ollama,)
 LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
 LOCAL_OLLAMA := http://localhost:11534
@@ -48,11 +49,13 @@ seed:
 # up — вся система одной командой, строгий порядок из CLAUDE.md:
 #   gen (файлы) → инфраструктура up+wait → topology apply → seed → агенты и шлюз up.
 # Знания раньше агентов (иначе паспорт-сверка уронит rag); шлюз после apply (иначе его очереди ещё нет).
+# PROFILES: для *-local активируем compose-профиль local (поднимает Ollama), иначе — ничего.
+PROFILES := $(if $(filter %-local,$(CONFIG)),--profile local,)
 up: gen
-	$(COMPOSE) up -d --wait $(INFRA)
+	$(COMPOSE) $(PROFILES) up -d --wait $(INFRA)
 	RABBITMQ_URL=$(LOCAL_RABBITMQ) uv run python -m agentarium apply configs/$(CONFIG).yaml
 	QDRANT_URL=$(LOCAL_QDRANT) OLLAMA_BASE_URL=$(LOCAL_OLLAMA) uv run --extra brains python -m tools.ingest configs/$(CONFIG).yaml $(COLLECTION)
-	$(COMPOSE) up -d --build --wait
+	$(COMPOSE) $(PROFILES) up -d --build --wait
 
 # demo — полный цикл: up конфигурации + прогон трёх демо-заявок spec/55 (заявка → путь → ответ).
 # Требует живой ключ GigaChat. Смена CONFIG пересобирает систему, включая шлюз.

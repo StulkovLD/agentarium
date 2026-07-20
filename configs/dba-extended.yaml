@@ -29,10 +29,10 @@ collections:                    # общие коллекции знаний: в
   # с хоста (seed/тесты) перебивается переменной OLLAMA_BASE_URL=http://localhost:11434 (spec/45).
   regulations:
     source: knowledge/regulations
-    embeddings: { provider: ollama, model: bge-m3, base_url: http://ollama:11434 }
+    embeddings: { provider: gigachat, model: Embeddings }
   incidents:                    # истории инцидентов для аудита плана (конфигурация B, spec/55)
     source: knowledge/incidents
-    embeddings: { provider: ollama, model: bge-m3, base_url: http://ollama:11434 }
+    embeddings: { provider: gigachat, model: Embeddings }
 
 routes:                         # маршруты переключены на аудит: план уходит аудитору, финал — аудит
   request.new:      [parser]
