@@ -18,6 +18,7 @@ CATALOG_PATH = "agents/catalog.yaml"
 HEALTH_PORT = 8000
 
 MOUNT_TARGET = "/etc/agentarium/topology.yaml"  # куда монтируется чертёж внутрь контейнера
+DEFAULT_GIGACHAT_CA_BUNDLE = "/app/infra/certs/russian_trusted_ca.pem"
 GATEWAY = "gateway"
 # Образ шлюза: build-контекст — КОРЕНЬ репо (Dockerfile тянет core/agentarium + agents/ contract-
 # модули всех типов каталога, spec/30/40), а не папка core/gateway — из неё `..` за контекст закрыт.
@@ -73,7 +74,13 @@ def _host_path(path: str) -> str:
 def _service(
     *, build: dict, instance: str | None, config_path: str, ports: list[str] | None = None
 ) -> dict:
-    environment = {"AGENTARIUM_CONFIG": MOUNT_TARGET}
+    environment = {
+        "AGENTARIUM_CONFIG": MOUNT_TARGET,
+        # Сертификат НУЦ уже копируется в каждый образ. Compose подставляет пользовательское
+        # значение из .env, если сеть требует корпоративный CA; иначе работает сертификат из repo.
+        "GIGACHAT_CA_BUNDLE_FILE": "${GIGACHAT_CA_BUNDLE_FILE:-"
+        f"{DEFAULT_GIGACHAT_CA_BUNDLE}" + "}",
+    }
     if instance is not None:
         environment["AGENT_INSTANCE"] = instance  # шлюз имени экземпляра не имеет
     service = {

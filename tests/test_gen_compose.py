@@ -3,7 +3,7 @@
 import yaml
 from agentarium.topology import load_catalog, load_topology
 
-from tools.gen_compose import HEALTH_PORT, MOUNT_TARGET, generate, render
+from tools.gen_compose import DEFAULT_GIGACHAT_CA_BUNDLE, HEALTH_PORT, MOUNT_TARGET, generate, render
 
 CATALOG = load_catalog("agents/catalog.yaml")
 CONFIG = "configs/echo-pair.yaml"
@@ -39,6 +39,9 @@ def test_agent_service_shape():
     assert echo["env_file"] == [".env"]
     assert echo["environment"]["AGENT_INSTANCE"] == "echo"
     assert echo["environment"]["AGENTARIUM_CONFIG"] == MOUNT_TARGET
+    assert echo["environment"]["GIGACHAT_CA_BUNDLE_FILE"] == (
+        "${GIGACHAT_CA_BUNDLE_FILE:-" + DEFAULT_GIGACHAT_CA_BUNDLE + "}"
+    )
     # чертёж смонтирован read-only, источник начинается с ./ (иначе compose примет за named volume)
     assert echo["volumes"] == [f"./{CONFIG}:{MOUNT_TARGET}:ro"]
     assert str(HEALTH_PORT) in " ".join(echo["healthcheck"]["test"])

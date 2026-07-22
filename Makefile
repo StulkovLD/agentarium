@@ -17,7 +17,7 @@ LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
 LOCAL_OLLAMA := http://localhost:11534
 
-.PHONY: test test-integration test-e2e lint gen apply up demo seed down
+.PHONY: test test-integration test-e2e lint gen apply up demo demo-local seed down
 
 test:
 	uv run pytest -m "not integration" -q
@@ -61,6 +61,11 @@ up: gen
 # Требует живой ключ GigaChat. Смена CONFIG пересобирает систему, включая шлюз.
 demo: up
 	uv run python demo/run_demo.py
+
+# demo-local — та же демонстрация, но RAG-векторы считает локальная bge-m3 в Ollama.
+# Чат-модели parser/executor остаются в GigaChat API; CONFIG скрыт, чтобы путь был одной командой.
+demo-local:
+	$(MAKE) demo CONFIG=dba-base-local
 
 # down — остановить и снести стенд (контейнеры + сеть; тома-склады сохраняются). --profile local
 # снимает и Ollama, если он поднимался офлайн-путём. Тома удаляются только явным down -v.
