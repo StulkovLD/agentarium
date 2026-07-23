@@ -23,8 +23,11 @@ GATEWAY_QUEUE = "agentarium.gateway"
 FAILED_WILDCARD = "*.failed"  # служебный сток: любой X.failed дублируется в dlq для разбора
 MANAGEMENT_PORT = 15672
 
-# Служебные стоки — в защищённом списке: diff реконсиляции их не трогает (spec/40 п.3).
-_PROTECTED_QUEUES = frozenset({DLQ, GATEWAY_QUEUE})
+# Защищён только конец линии (spec/40 п.3): dlq и его привязки diff не трогает. Очередь шлюза
+# реконсилируется как рабочие — её биндинги суть finals чертежа и меняются со сменой конфигурации;
+# вечная защита оставляла бы биндинг старого финала (A: plan.ready→gateway) в конфигурации B,
+# и здоровый конверт летел бы в шлюз мимо finals → dlq → заявка убита. Поймано живым прогоном A→B.
+_PROTECTED_QUEUES = frozenset({DLQ})
 
 # dlq — исключение из QUEUE_ARGUMENTS: конец линии, без delivery-limit и без DLX (spec/40 п.2).
 _DLQ_ARGUMENTS = {"x-queue-type": "quorum"}

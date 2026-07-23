@@ -48,11 +48,27 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --group dev
+      # target-db («пациент») нельзя поднять сервис-контейнером: ему нужны init-скрипты из репо
+      # (роли, схема billing, гранты), а services стартуют до checkout. Поднимаем шагом после
+      # checkout — тот же образ, порт и init-путь, что в docker-compose.yml.
+      - name: target-db c init-скриптами
+        run: |
+          docker run -d --name target-db \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=pacient -e POSTGRES_DB=billing \
+            -p 5434:5432 \
+            -v "$GITHUB_WORKSPACE/infra/target-db/init":/docker-entrypoint-initdb.d:ro \
+            postgres:16.10
+          for i in $(seq 1 60); do
+            docker exec target-db pg_isready -U postgres -d billing >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "target-db не поднялся"; docker logs target-db; exit 1
       # Тесты, которым нужен живой Ollama (bge-m3, ~1.2 ГБ) или GigaChat (e2e), гейтятся
       # graceful-skip'ом внутри самих тестов — в CI без них они пропускаются, остальная
-      # интеграция бежит на сервис-контейнерах брокера, Postgres и Qdrant.
+      # интеграция бежит на сервис-контейнерах брокера, Postgres, Qdrant и target-db.
       - run: uv run pytest -m integration -q
         env:
           RABBITMQ_URL: amqp://agentarium:agentarium@localhost:5672/
           POSTGRES_DSN: postgresql://agentarium:agentarium@localhost:5433/agentarium
           QDRANT_URL: http://localhost:6333
+          TARGET_DB_DSN: postgresql://readonly_executor:readonly@localhost:5434/billing

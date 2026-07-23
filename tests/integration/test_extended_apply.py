@@ -102,3 +102,26 @@ async def test_apply_extended_declares_auditor_queue_and_switched_bindings(clean
     assert ("agentarium.parser", "request.new") in main
     assert ("agentarium.executor", "knowledge.found") in main
     assert report.reconciled
+
+
+async def test_apply_switch_base_to_extended_removes_stale_gateway_binding(clean):
+    """Смена конфигурации A→B на одном брокере: биндинг старого финала снимается.
+
+    Живой прод-сценарий: в A план — финал (plan.ready → gateway), в B план уходит аудитору.
+    Без снятия сироты конверт plan.ready фан-аутится и в auditor, и в gateway; шлюз B не ждёт
+    plan.ready (рассинхрон finals) → сброс в dlq → dlq-финализация убивает здоровую заявку.
+    Чистый брокер этот случай не ловит — сирота существует только после реального перехода.
+    """
+    url = clean
+    base_topo = load_topology("configs/dba-base.yaml", CATALOG, environ=ENV)
+    await apply_topology(base_topo, amqp_url=url)
+    assert (GATEWAY_QUEUE, "plan.ready") in await _bindings(url, EXCHANGE)  # в A план — финал
+
+    ext_topo = load_topology(DBA_EXTENDED, CATALOG, environ=ENV)
+    report = await apply_topology(ext_topo, amqp_url=url)
+
+    main = await _bindings(url, EXCHANGE)
+    assert (GATEWAY_QUEUE, "plan.ready") not in main, "сирота старого финала пережила реконсиляцию"
+    assert ("agentarium.auditor", "plan.ready") in main
+    assert (GATEWAY_QUEUE, "audit.done") in main
+    assert (GATEWAY_QUEUE, "plan.ready") in report.bindings_removed
