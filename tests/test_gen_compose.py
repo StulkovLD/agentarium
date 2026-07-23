@@ -3,7 +3,13 @@
 import yaml
 from agentarium.topology import load_catalog, load_topology
 
-from tools.gen_compose import DEFAULT_GIGACHAT_CA_BUNDLE, HEALTH_PORT, MOUNT_TARGET, generate, render
+from tools.gen_compose import (
+    DEFAULT_GIGACHAT_CA_BUNDLE,
+    HEALTH_PORT,
+    MOUNT_TARGET,
+    generate,
+    render,
+)
 
 CATALOG = load_catalog("agents/catalog.yaml")
 CONFIG = "configs/echo-pair.yaml"
