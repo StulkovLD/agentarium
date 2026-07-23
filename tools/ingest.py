@@ -168,7 +168,10 @@ def ingest(
     catalog = load_catalog(catalog_path)
     topo = load_topology(config_path, catalog)
     if not topo.collections:
-        raise ValueError(f"в чертеже {config_path} нет секции collections — индексировать нечего")
+        # Система без RAG (например echo-pair) валидна по рубежу 1 — make up зовёт индексацию
+        # для любого чертежа, поэтому пустые collections — штатный no-op, не ошибка.
+        out(f"в чертеже {config_path} нет секции collections — индексировать нечего")
+        return {}
 
     if collection is None:
         targets = dict(topo.collections)

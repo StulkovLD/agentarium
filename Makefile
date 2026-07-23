@@ -17,7 +17,7 @@ LOCAL_RABBITMQ := amqp://agentarium:agentarium@localhost:5672/
 LOCAL_QDRANT := http://localhost:6333
 LOCAL_OLLAMA := http://localhost:11534
 
-.PHONY: test test-integration test-e2e lint gen apply up demo demo-local seed down
+.PHONY: test test-integration test-e2e lint gen apply up demo demo-local demo-extended demo-extended-local demo-echo seed down
 
 test:
 	uv run pytest -m "not integration" -q
@@ -66,6 +66,20 @@ demo: up
 # Чат-модели parser/executor остаются в GigaChat API; CONFIG скрыт, чтобы путь был одной командой.
 demo-local:
 	$(MAKE) demo CONFIG=dba-base-local
+
+# demo-extended[-local] — конфигурация B: тот же конвейер + агент-аудитор (план → сверка с историей
+# инцидентов). Суффикс -local — та же развилка эмбеддингов, что у базового демо.
+demo-extended:
+	$(MAKE) demo CONFIG=dba-extended
+
+demo-extended-local:
+	$(MAKE) demo CONFIG=dba-extended-local
+
+# demo-echo — техническое демо без LLM и без ключа: текст проходит цепочку echo → reverse.
+# Доказательство «агентом может быть любая логика»: шина, доставка и трейсинг те же.
+demo-echo:
+	$(MAKE) up CONFIG=echo-pair
+	uv run python demo/run_echo.py
 
 # down — остановить и снести стенд (контейнеры + сеть; тома-склады сохраняются). --profile local
 # снимает и Ollama, если он поднимался офлайн-путём. Тома удаляются только явным down -v.
