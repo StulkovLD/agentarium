@@ -11,8 +11,8 @@ gates:
     status: closed_accepted   # ядро построено; live-smoke чата GigaChat прошёл зелёным 2026-07-19
   G2-poc-live:         # конфигурация A доказана живьём; живучесть доказана тестами+наблюдением. Статусы: pending|open|closed_accepted|skipped
     status: closed_accepted
-  G3-release:          # чистый клон собирается (uv sync+ruff+110 unit+LICENSE ✓); полный make demo на клоне ждёт восстановления квоты GigaChat
-    status: open
+  G3-release:          # чистый клон: uv sync+ruff+111 unit ✓ (трижды свежими клонами); CI GitHub зелёный (lint+unit+integration с target-db); A-local, B-local и echo прогнаны живьём
+    status: closed_accepted
 
 slices:
   S1-skeleton-envelope: done   # 10 контрактных тестов, ruff чист, схема экспортирована
@@ -22,7 +22,7 @@ slices:
   S5-storage: done   # 54 unit + 21 integration; паспорт id=0, инжест идемпотентен; хост-порт pg → 5433
   S6-gateway: done   # шлюз универсален, образ собран, 62 unit + 27 integration; e2e echo-цепочка зелёная
   S7-poc-demo-resilience: done  # конфигурация A доказана живьём (model routing Lite+Ultra, реальные проверки БД); живучесть — 37 integration + наблюдение в бою; наглядный chaos.sh ждёт стабильного pipeline (не блок)
-  S8-extended-config: code_done_live_pending  # auditor + dba-extended: 102u+36i зелёные; живой прогон ждёт ключ
+  S8-extended-config: done  # конфигурация B прогнана живьём 2026-07-23 (extended-local): 4 агента, аудит нашёл в плане повтор грабель инцидента; по пути пойман и вскрыт баг реконсиляции финал-биндингов (спека+код+тест перехода A→B)
   S9-polish-release: done  # витрина доведена до «сухо» (2 прохода онбординга 8→9/10), security чист, репо публичный; полный e2e-демо и chaos-запись ждут доступ к эмбеддингам GigaChat
 
 authorized:
