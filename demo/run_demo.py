@@ -76,6 +76,11 @@ def main() -> int:
             _render(text, body)
             if body["status"] == "timeout":
                 failures += 1
+            # Смерть конверта в dlq — провал прогона, в отличие от честного отказа parser'а:
+            # без этого демо маскирует беду («failed» бывает и легитимным — request.rejected).
+            reason = (body.get("result") or {}).get("reason", "")
+            if isinstance(reason, str) and reason.startswith("конверт мёртв"):
+                failures += 1
     print(_LINE)
     print("демо завершено" if not failures else f"демо завершено с ошибками: {failures}")
     return 1 if failures else 0
